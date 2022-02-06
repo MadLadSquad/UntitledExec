@@ -60,12 +60,36 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 
 #ifdef _WIN32
 
-	bool bSuccess = CreatePipe(pipehandles[0], pipehandles[2], nullptr, 0);
-	if (bSuccess)
+	//bool bSuccess = CreatePipe(pipehandles[0], pipehandles[2], nullptr, 0);
+	uexecstring ext = args[0];
+	char filename[MAX_PATH];
+	LPSTR filepart;
+
+	if (!ext.empty() && !SearchPathA(nullptr, args[0], ext.substr(ext.find_last_of("."), ext.size() - 1).data(), MAX_PATH, filename, &filepart))
 	{
-	
+		return -1;
 	}
 
+	uexecstring str = uexecstring(filename) + " ";
+	for (size_t i = 1; args[i] != nullptr; i++)
+		str += uexecstring(args[i]) + " ";
+
+	PROCESS_INFORMATION pif;
+	STARTUPINFO si;
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	if (!CreateProcessA(filename, str.data(), nullptr, nullptr, false, 0, nullptr, nullptr, &si, &pif));
+	{
+		return -1;
+	}
+
+	thread = std::thread([&]() {
+		WaitForSingleObject(pif.hProcess, INFINITE);
+		WaitForSingleObject(pif.hThread, INFINITE);
+		CloseHandle(pif.hProcess);
+		CloseHandle(pif.hThread);
+		bFinished = true;
+	});
 #else
 	pid = fork();
 	if (pid != -1 && pout != -1)
@@ -102,31 +126,35 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 
 void uexec::ScriptRunner::update(bool bFirst)
 {
-	if (bCanUpdate && pid > 0)
+	if (bCanUpdate)
 	{
-		std::vector<char> buf;
-		buf.reserve(bufferSize);
+		
 		
 #ifdef _WIN32
 
 #else
-		if (bFirst)
-			close(pipefd[1]);
-		if (read(pipefd[0], buf.data(), sizeof(buf.data())) != 0)
+		if (pid > 0)
 		{
-			uexecstring tmp = buf.data();
-			tmp.shrink_to_fit();
-			stringBuffer += tmp;
-			uexecstring accumulate;
-			for (auto& a : stringBuffer)
+			std::vector<char> buf;
+			buf.reserve(bufferSize);
+			if (bFirst)
+				close(pipefd[1]);
+			if (read(pipefd[0], buf.data(), sizeof(buf.data())) != 0)
 			{
-				if (a == '\n')
+				uexecstring tmp = buf.data();
+				tmp.shrink_to_fit();
+				stringBuffer += tmp;
+				uexecstring accumulate;
+				for (auto& a : stringBuffer)
 				{
-					lineBuffer.push_back(accumulate);
-					accumulate.clear();
+					if (a == '\n')
+					{
+						lineBuffer.push_back(accumulate);
+						accumulate.clear();
+					}
+					else
+						accumulate += a;
 				}
-				else
-					accumulate += a;
 			}
 		}
 #endif
@@ -135,21 +163,30 @@ void uexec::ScriptRunner::update(bool bFirst)
 
 void uexec::ScriptRunner::updateBufferSize()
 {
-	if (bCanUpdate && pid > 0)
+	if (bCanUpdate)
 	{
+#ifndef _WIN32
+		if (pid > 0)
+		{
+#endif
 		stringBuffer.clear();
 		stringBuffer.reserve(bufferSize);
+#ifndef _WIN32
+		}
+#endif
 	}
 }
 
 void uexec::ScriptRunner::destroy()
 {
-	bValid = false;
-}
-
-int& uexec::ScriptRunner::getPID()
-{
-	return pid;
+	if (finished())
+	{
+#ifdef _WIN32
+		if (thread.joinable())
+			thread.join();
+#endif
+		bValid = false;
+	}
 }
 
 bool uexec::ScriptRunner::valid() const
@@ -159,16 +196,32 @@ bool uexec::ScriptRunner::valid() const
 
 void uexec::ScriptRunner::destroyForReuse()
 {
-	stringBuffer.clear();
-	lineBuffer.clear();
-	bCanUpdate = false;
-	bValid = true;
-	pid = -1;
+	if (finished())
+	{
+		stringBuffer.clear();
+		lineBuffer.clear();
+		bCanUpdate = false;
+		bValid = true;
+		bFinished = false;
 #ifdef _WIN32
-	
+		pipehandles[0] = nullptr;
+		pipehandles[1] = nullptr;
+		if (thread.joinable())
+			thread.join();
 #else
-	pipefd[0] = -1;
-	pipefd[1] = -1;
+		pid = -1;
+		pipefd[0] = -1;
+		pipefd[1] = -1;
+#endif
+	}
+}
+
+bool uexec::ScriptRunner::finished() const
+{
+#ifdef _WIN32
+	return bFinished;
+#else
+	return (bCanUpdate && currentpid == -1 ? true : false);
 #endif
 }
 

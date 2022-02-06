@@ -13,6 +13,7 @@
 #include <vector>
 #ifdef _WIN32
 	#include <windows.h>
+	#include <thread>
 #endif
 
 namespace uexec
@@ -31,19 +32,21 @@ namespace uexec
 		void updateBufferSize();
 		// Destroys the runner
 		void destroy();
-		int& getPID();
 		bool valid() const;
 		// Makes the runner reusable
 		void destroyForReuse();
-
+		bool finished() const;
 		std::vector<uexecstring>& data();
 	private:
 		std::vector<uexecstring> lineBuffer;
-		int pid = -1;
 #ifdef _WIN32
 		PHANDLE pipehandles[2];
+		PROCESS_INFORMATION pif;
+		std::thread thread;
+		bool bFinished = false;
 #else
 		int pipefd[2]; // pipe file descriptors
+		int pid = -1;
 #endif
 		uexecstring stringBuffer;
 		bool bCanUpdate = false;
