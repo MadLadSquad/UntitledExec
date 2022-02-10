@@ -24,7 +24,7 @@ namespace uexec
 	class ScriptRunner
 	{
 	public:
-		// Given an array, will start executing the script, will return -1 on failiure
+		// Given an array, will start executing the script, will return -1 on failure
 		int init(char* const* args, uint32_t size);
 		// Updates the buffer stream, call this with true the first time
 		void update(bool bFirst = false);
@@ -32,10 +32,11 @@ namespace uexec
 		void updateBufferSize();
 		// Destroys the runner
 		void destroy();
-		bool valid() const;
+		[[nodiscard]] bool valid() const;
 		// Makes the runner reusable
 		void destroyForReuse();
-		bool finished() const;
+		[[nodiscard]] bool finished() const;
+        [[nodiscard]] bool startable() const;
 		std::vector<uexecstring>& data();
 	private:
 		std::vector<uexecstring> lineBuffer;
@@ -51,6 +52,7 @@ namespace uexec
 		uexecstring stringBuffer;
 		bool bCanUpdate = false;
 		bool bValid = true;
+        bool bCanRestart = true;
 		uint32_t bufferSize = 128;
 	};
 

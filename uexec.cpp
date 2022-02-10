@@ -56,6 +56,7 @@ int uexec::execandwait(char* const* command)
 
 int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 {
+    bCanRestart = false;
 	stringBuffer.reserve(size);
 	bufferSize = size;
 
@@ -93,8 +94,9 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 	});
 #else
 	pid = fork();
-	if (pid != -1)
+    if (pid != -1)
 	{
+        currentpid = pid;
 		if (pid == 0)
 		{
 			close(pipefd[0]);
@@ -105,12 +107,12 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 			close(pipefd[1]);
 
 			execvp(args[0], args);
+            wait(&currentpid);
 		}
 		else
 		{
 			bCanUpdate = true;
-			currentpid = pid;
-			signal(SIGCHLD, [](int sig) 
+			signal(SIGCHLD, [](int sig)
 			{
 				if (currentpid > 0)
 				{
@@ -119,8 +121,11 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 				}
 			});
 		}
-
 	}
+    else
+    {
+        return -1;
+    }
 #endif
 	return 0;
 }
@@ -199,6 +204,7 @@ void uexec::ScriptRunner::destroyForReuse()
 {
 	if (finished())
 	{
+        bCanRestart = true;
 		stringBuffer.clear();
 		lineBuffer.clear();
 		bCanUpdate = false;
@@ -230,4 +236,9 @@ bool uexec::ScriptRunner::finished() const
 std::vector<uexecstring>& uexec::ScriptRunner::data()
 {
 	return lineBuffer;
+}
+
+bool uexec::ScriptRunner::startable() const
+{
+    return bCanRestart;
 }
