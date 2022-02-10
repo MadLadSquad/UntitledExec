@@ -18,7 +18,7 @@
 
 namespace uexec
 {
-	// An abstraction over execvp
+	// An abstraction over execvp and wait
 	int execandwait(char* const* command);
 	
 	class ScriptRunner
@@ -38,6 +38,9 @@ namespace uexec
 		[[nodiscard]] bool finished() const;
         [[nodiscard]] bool startable() const;
 		std::vector<uexecstring>& data();
+
+        // Terminates the process, use the destroy functions after calling terminate!
+        void terminate();
 	private:
 		std::vector<uexecstring> lineBuffer;
 #ifdef _WIN32

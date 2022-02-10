@@ -242,3 +242,14 @@ bool uexec::ScriptRunner::startable() const
 {
     return bCanRestart;
 }
+
+void uexec::ScriptRunner::terminate()
+{
+#ifdef _WIN32
+    TerminateProcess(pif.hProcess, 0);
+    WaitForSingleObject(pif.hProcess, INFINITE);
+#else
+    kill(currentpid, SIGTERM);
+    wait(&currentpid);
+#endif
+}
