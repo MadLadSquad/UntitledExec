@@ -92,7 +92,7 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 	});
 #else
 	pid = fork();
-	if (pid != -1 && pout != -1)
+	if (pid != -1)
 	{
 		if (pid == 0)
 		{
@@ -103,7 +103,7 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 
 			close(pipefd[1]);
 
-			execvp(cmd[0], cmd);
+			execvp(args[0], args);
 		}
 		else
 		{
@@ -202,8 +202,9 @@ void uexec::ScriptRunner::destroyForReuse()
 		lineBuffer.clear();
 		bCanUpdate = false;
 		bValid = true;
-		bFinished = false;
+
 #ifdef _WIN32
+        bFinished = false;
 		pipehandles[0] = nullptr;
 		pipehandles[1] = nullptr;
 		if (thread.joinable())
