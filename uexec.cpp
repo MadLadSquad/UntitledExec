@@ -51,6 +51,7 @@ int uexec::execandwait(char* const* command)
 	else
 		return -1;
 #endif
+    return 0;
 }
 
 int uexec::ScriptRunner::init(char* const* args, uint32_t size)
