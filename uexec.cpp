@@ -246,9 +246,9 @@ void uexec::ScriptRunner::terminate()
 {
 #ifdef _WIN32
 	TerminateProcess(pif.hProcess, 259);
+	bFinished = true;
 #else
     kill(currentpid, SIGTERM);
     wait(&currentpid);
 #endif
-	bFinished = true;
 }
