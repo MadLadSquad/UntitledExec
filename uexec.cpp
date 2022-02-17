@@ -7,6 +7,7 @@
 	#include <sys/wait.h>
 #endif
 #include <csignal>
+#include <chrono>
 
 int uexec::execandwait(char* const* command)
 {
@@ -76,22 +77,14 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 	for (size_t i = 1; args[i] != nullptr; i++)
 		str += uexecstring(args[i]) + " ";
 
-	PROCESS_INFORMATION pif;
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
+
 	si.cb = sizeof(si);
-	if (!CreateProcessA(filename, str.data(), nullptr, nullptr, false, 0, nullptr, nullptr, &si, &pif));
+	if (!CreateProcessA(filename, str.data(), nullptr, nullptr, false, NORMAL_PRIORITY_CLASS, nullptr, nullptr, &si, &pif));
 	{
 		return -1;
 	}
-
-	thread = std::thread([&]() {
-		WaitForSingleObject(pif.hProcess, INFINITE);
-		WaitForSingleObject(pif.hThread, INFINITE);
-		CloseHandle(pif.hProcess);
-		CloseHandle(pif.hThread);
-		bFinished = true;
-	});
 #else
 	pid = fork();
     if (pid != -1)
@@ -133,11 +126,17 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 void uexec::ScriptRunner::update(bool bFirst)
 {
 	if (bCanUpdate)
-	{
-		
-		
+	{	
 #ifdef _WIN32
-
+		if (WaitForSingleObject(pif.hProcess, 0) != WAIT_TIMEOUT)
+		{
+			
+			std::cout << "TESTING" << std::endl;
+			WaitForSingleObject(pif.hProcess, INFINITE);
+			CloseHandle(pif.hProcess);
+			CloseHandle(pif.hThread);
+			bFinished = true;
+		}
 #else
 		if (pid > 0)
 		{
@@ -246,10 +245,10 @@ bool uexec::ScriptRunner::startable() const
 void uexec::ScriptRunner::terminate()
 {
 #ifdef _WIN32
-    TerminateProcess(pif.hProcess, 0);
-    WaitForSingleObject(pif.hProcess, INFINITE);
+	TerminateProcess(pif.hProcess, 259);
 #else
     kill(currentpid, SIGTERM);
     wait(&currentpid);
 #endif
+	bFinished = true;
 }
