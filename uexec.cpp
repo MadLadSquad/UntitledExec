@@ -9,7 +9,7 @@
 #include <csignal>
 #include <chrono>
 
-int uexec::execandwait(char* const* command)
+int uexec::execandwait(char* const* command) noexcept
 {
 #ifdef _WIN32
 	uexecstring ext = command[0];
@@ -55,7 +55,7 @@ int uexec::execandwait(char* const* command)
     return 0;
 }
 
-int uexec::ScriptRunner::init(char* const* args, uint32_t size)
+int uexec::ScriptRunner::init(char* const* args, uint32_t size) noexcept
 {
     bCanRestart = false;
 	stringBuffer.reserve(size);
@@ -85,6 +85,7 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 	{
 		return -1;
 	}
+	
 #else
 	pid = fork();
     if (pid != -1)
@@ -123,15 +124,13 @@ int uexec::ScriptRunner::init(char* const* args, uint32_t size)
 	return 0;
 }
 
-void uexec::ScriptRunner::update(bool bFirst)
+void uexec::ScriptRunner::update(bool bFirst) noexcept
 {
 	if (bCanUpdate)
 	{	
 #ifdef _WIN32
 		if (WaitForSingleObject(pif.hProcess, 0) != WAIT_TIMEOUT)
 		{
-			
-			std::cout << "TESTING" << std::endl;
 			WaitForSingleObject(pif.hProcess, INFINITE);
 			CloseHandle(pif.hProcess);
 			CloseHandle(pif.hThread);
@@ -166,7 +165,7 @@ void uexec::ScriptRunner::update(bool bFirst)
 	}
 }
 
-void uexec::ScriptRunner::updateBufferSize()
+void uexec::ScriptRunner::updateBufferSize() noexcept
 {
 	if (bCanUpdate)
 	{
@@ -182,7 +181,7 @@ void uexec::ScriptRunner::updateBufferSize()
 	}
 }
 
-void uexec::ScriptRunner::destroy()
+void uexec::ScriptRunner::destroy() noexcept
 {
 	if (finished())
 	{
@@ -194,12 +193,12 @@ void uexec::ScriptRunner::destroy()
 	}
 }
 
-bool uexec::ScriptRunner::valid() const
+bool uexec::ScriptRunner::valid() const noexcept
 {
 	return bValid;
 }
 
-void uexec::ScriptRunner::destroyForReuse()
+void uexec::ScriptRunner::destroyForReuse() noexcept
 {
 	if (finished())
 	{
@@ -223,7 +222,7 @@ void uexec::ScriptRunner::destroyForReuse()
 	}
 }
 
-bool uexec::ScriptRunner::finished() const
+bool uexec::ScriptRunner::finished() const noexcept
 {
 #ifdef _WIN32
 	return bFinished;
@@ -232,20 +231,23 @@ bool uexec::ScriptRunner::finished() const
 #endif
 }
 
-std::vector<uexecstring>& uexec::ScriptRunner::data()
+std::vector<uexecstring>& uexec::ScriptRunner::data() noexcept
 {
 	return lineBuffer;
 }
 
-bool uexec::ScriptRunner::startable() const
+bool uexec::ScriptRunner::startable() const noexcept
 {
     return bCanRestart;
 }
 
-void uexec::ScriptRunner::terminate()
+void uexec::ScriptRunner::terminate() noexcept
 {
 #ifdef _WIN32
 	TerminateProcess(pif.hProcess, 259);
+	CloseHandle(pif.hThread);
+	CloseHandle(pif.hProcess);
+
 	bFinished = true;
 #else
     kill(currentpid, SIGTERM);

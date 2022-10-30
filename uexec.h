@@ -19,28 +19,28 @@
 namespace uexec
 {
 	// An abstraction over execvp and wait
-	int execandwait(char* const* command);
+	int execandwait(char* const* command) noexcept;
 	
 	class ScriptRunner
 	{
 	public:
 		// Given an array, will start executing the script, will return -1 on failure
-		int init(char* const* args, uint32_t size);
+		int init(char* const* args, uint32_t size) noexcept;
 		// Updates the buffer stream, call this with true the first time
-		void update(bool bFirst = false);
+		void update(bool bFirst = false) noexcept;
 		// Will update the size of the buffer
-		void updateBufferSize();
+		void updateBufferSize() noexcept;
 		// Destroys the runner
-		void destroy();
-		[[nodiscard]] bool valid() const;
+		void destroy() noexcept;
+		[[nodiscard]] bool valid() const noexcept;
 		// Makes the runner reusable
-		void destroyForReuse();
-		[[nodiscard]] bool finished() const;
-        [[nodiscard]] bool startable() const;
-		std::vector<uexecstring>& data();
+		void destroyForReuse() noexcept;
+		[[nodiscard]] bool finished() const noexcept;
+        [[nodiscard]] bool startable() const noexcept;
+		std::vector<uexecstring>& data() noexcept;
 
         // Terminates the process, use the destroy functions after calling terminate!
-        void terminate();
+        void terminate() noexcept;
 	private:
 		std::vector<uexecstring> lineBuffer;
 #ifdef _WIN32
