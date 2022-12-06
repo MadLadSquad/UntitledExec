@@ -42,12 +42,16 @@ namespace uexec
         // Terminates the process, use the destroy functions after calling terminate!
         void terminate() noexcept;
 	private:
-		std::vector<uexecstring> lineBuffer;
+		friend class InternalUnix;
+		friend class InternalWindows;
+
+		std::vector<uexecstring> lineBuffer;	// The buffer of lines
 #ifdef _WIN32
-		PHANDLE pipehandles[2];
-		PROCESS_INFORMATION pif;
-		std::thread thread;
-		bool bFinished = false;
+		PHANDLE pipehandles[2];					// The handles for the pipes
+		PROCESS_INFORMATION pif;				// The process information struct, contains a handle to the process
+		HANDLE process;							// The PID, we use this to terminate the process
+		//std::thread thread;					// A thread used here for no reason
+		bool bFinished = false;					// This indicates whether the process has finished executing in order to destroy it
 #else
 		int pipefd[2]; // pipe file descriptors
 		int pid = -1;
