@@ -128,7 +128,7 @@ void uexec::InternalWindows::terminateWindows(ScriptRunner* ctx) noexcept
 }
 
 #else
-int uexec::InternalWindows::execandwaitUnix(char* const* command) noexcept
+int uexec::InternalWindows::execandwaitWindows(char* const* command) noexcept
 {
 	return -1;
 }
