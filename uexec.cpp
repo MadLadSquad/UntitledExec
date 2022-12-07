@@ -111,3 +111,13 @@ void uexec::ScriptRunner::terminate() noexcept
 	InternalWindows::terminateWindows(this);
 	InternalUnix::terminateUnix(this);
 }
+
+bool uexec::ScriptRunner::read(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesRead) noexcept
+{
+	return false;
+}
+
+bool uexec::ScriptRunner::write(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesWritten) noexcept
+{
+	return false;
+}

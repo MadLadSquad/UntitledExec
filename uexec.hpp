@@ -16,11 +16,24 @@
 	#include <thread>
 #endif
 
+
+#define WIN_PIPE_READ 0
+#define WIN_PIPE_WRITE 1
+
+
 namespace uexec
 {
 	// An abstraction over execvp and wait
 	int execandwait(char* const* command) noexcept;
 	
+	enum UExecStreams
+	{
+		UEXEC_STREAM_STD_OUT,
+		UEXEC_STREAM_STD_IN,
+		UEXEC_STREAM_STD_ERR,
+
+	};
+
 	class ScriptRunner
 	{
 	public:
@@ -41,16 +54,25 @@ namespace uexec
 
         // Terminates the process, use the destroy functions after calling terminate!
         void terminate() noexcept;
+
+		// Read from STDOUT, STDIN and STDERR
+		bool read(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesRead) noexcept;
+
+		// Write to STDOUT, STDIN and STDERR
+		bool write(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesWritten) noexcept;
 	private:
 		friend class InternalUnix;
 		friend class InternalWindows;
 
 		std::vector<uexecstring> lineBuffer;	// The buffer of lines
 #ifdef _WIN32
-		PHANDLE pipehandles[2];					// The handles for the pipes
 		PROCESS_INFORMATION pif;				// The process information struct, contains a handle to the process
 		HANDLE process;							// The PID, we use this to terminate the process
-		//std::thread thread;					// A thread used here for no reason
+		
+		// [0] READ, [1] WRITE, you can use the WIN_PIPE_READ and WIN_PIPE_WRITE macros for this
+		HANDLE pipefd[2];
+		SECURITY_ATTRIBUTES sa;
+
 		bool bFinished = false;					// This indicates whether the process has finished executing in order to destroy it
 #else
 		int pipefd[2]; // pipe file descriptors

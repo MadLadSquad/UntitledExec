@@ -72,6 +72,24 @@ int uexec::InternalWindows::initWindows(char* const* args, uint32_t size, Script
 	{
 		return -1;
 	}
+
+	SECURITY_ATTRIBUTES sa;
+	ZeroMemory(&sa, sizeof(sa));
+
+	sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+	sa.bInheritHandle = true;
+	sa.lpSecurityDescriptor = nullptr;
+
+	if (!CreatePipe(&ctx->pipefd[WIN_PIPE_READ], &ctx->pipefd[WIN_PIPE_WRITE], &sa, 0))
+		return -1;
+
+	si.hStdOutput = ctx->pipefd[WIN_PIPE_WRITE];
+	si.hStdError = ctx->pipefd[WIN_PIPE_WRITE];
+	si.dwFlags = STARTF_USESTDHANDLES;
+
+	if (!SetStdHandle(STD_OUTPUT_HANDLE, ctx->pipefd[WIN_PIPE_WRITE]) && !SetStdHandle(STD_ERROR_HANDLE, ctx->pipefd[WIN_PIPE_WRITE]))
+		return -1;
+
 }
 
 void uexec::InternalWindows::updateWindows(bool bFirst, ScriptRunner* ctx) noexcept
@@ -86,8 +104,8 @@ void uexec::InternalWindows::updateWindows(bool bFirst, ScriptRunner* ctx) noexc
 void uexec::InternalWindows::destroyForReuseWindows(ScriptRunner* ctx) noexcept
 {
 	ctx->bFinished = false;
-	ctx->pipehandles[0] = nullptr;
-	ctx->pipehandles[1] = nullptr;
+	ctx->pipefd[0] = nullptr;
+	ctx->pipefd[1] = nullptr;
 	ctx->process = 0;
 }
 
@@ -100,6 +118,9 @@ void uexec::InternalWindows::terminateWindows(ScriptRunner* ctx) noexcept
 {
 	// Go to line 69 for angry assay
 	TerminateProcess(ctx->pif.hProcess, 0);
+
+	CloseHandle(ctx->pipefd[WIN_PIPE_READ]);
+	CloseHandle(ctx->pipefd[WIN_PIPE_WRITE]);
 	CloseHandle(ctx->pif.hThread);
 	CloseHandle(ctx->pif.hProcess);
 	
