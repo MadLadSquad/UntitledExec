@@ -20,6 +20,7 @@ int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 	}
 	else
 		return -1;
+	return 0;
 }
 
 int uexec::InternalUnix::initUnix(char* const* args, uint32_t size, ScriptRunner* ctx) noexcept
