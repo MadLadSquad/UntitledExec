@@ -38,7 +38,7 @@ namespace uexec
 	{
 	public:
 		// Given an array, will start executing the script, will return -1 on failure
-		int init(char* const* args, uint32_t size) noexcept;
+		int init(char* const* args, uint32_t size, bool bOpenStderrPipe = false, bool bOpenStdoutPipe = false, bool bOpenStdinPipe = false) noexcept;
 		// Updates the buffer stream, call this with true the first time
 		void update(bool bFirst = false) noexcept;
 		// Will update the size of the buffer
@@ -56,10 +56,11 @@ namespace uexec
         void terminate() noexcept;
 
 		// Read from STDOUT, STDIN and STDERR
-		bool read(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesRead) noexcept;
+		bool readSTDOUT(uexecstring& buffer, size_t size, size_t& bytesRead) noexcept;
+		bool readSTDERR(uexecstring& buffer, size_t size, size_t& bytesRead) noexcept;
 
 		// Write to STDOUT, STDIN and STDERR
-		bool write(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesWritten) noexcept;
+		bool write(uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept;
 	private:
 		friend class InternalUnix;
 		friend class InternalWindows;
@@ -67,11 +68,12 @@ namespace uexec
 		std::vector<uexecstring> lineBuffer;	// The buffer of lines
 #ifdef _WIN32
 		PROCESS_INFORMATION pif;				// The process information struct, contains a handle to the process
-		HANDLE process;							// The PID, we use this to terminate the process
-		
-		// [0] READ, [1] WRITE, you can use the WIN_PIPE_READ and WIN_PIPE_WRITE macros for this
-		HANDLE pipefd[2];
-		SECURITY_ATTRIBUTES sa;
+		HANDLE stderrRead, stdoutRead, stdinRead;
+		HANDLE stderrWrite, stdoutWrite, stdinWrite;
+
+		bool stderrOpen = false;
+		bool stdoutOpen = false;
+		bool stdinOpen = false;
 
 		bool bFinished = false;					// This indicates whether the process has finished executing in order to destroy it
 #else

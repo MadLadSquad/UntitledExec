@@ -21,11 +21,15 @@ int uexec::execandwait(char* const* command) noexcept
 #endif
 }
 
-int uexec::ScriptRunner::init(char* const* args, uint32_t size) noexcept
+int uexec::ScriptRunner::init(char* const* args, uint32_t size, bool bOpenStderrPipe, bool bOpenStdoutPipe, bool bOpenStdinPipe) noexcept
 {
     bCanRestart = false;
 	stringBuffer.reserve(size);
 	bufferSize = size;
+
+	stderrOpen = bOpenStderrPipe;
+	stdoutOpen = bOpenStdoutPipe;
+	stdinOpen = bOpenStdinPipe;
 
 #ifdef _WIN32
 	return InternalWindows::initWindows(args, size, this);
@@ -112,12 +116,29 @@ void uexec::ScriptRunner::terminate() noexcept
 	InternalUnix::terminateUnix(this);
 }
 
-bool uexec::ScriptRunner::read(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesRead) noexcept
+bool uexec::ScriptRunner::readSTDOUT(uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
-	return false;
+#ifdef _WIN32
+	return InternalWindows::readWindows(this, stdoutRead, buffer, size, bytesRead);
+#else
+	return InternalUnix::readUnix(this, buffer, size, bytesRead);
+#endif
 }
 
-bool uexec::ScriptRunner::write(UExecStreams stream, std::string& buffer, size_t size, size_t& bytesWritten) noexcept
+bool uexec::ScriptRunner::readSTDERR(uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
-	return false;
+#ifdef _WIN32
+	return InternalWindows::readWindows(this, stderrRead, buffer, size, bytesRead);
+#else
+	return InternalUnix::readUnix(this, buffer, size, bytesRead);
+#endif
+}
+
+bool uexec::ScriptRunner::write(uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+{
+#ifdef _WIN32
+	return InternalWindows::writeWindows(this, buffer, size, bytesWritten);
+#else
+	return InternalUnix::writeUnix(this, buffer, size, bytesWritten);
+#endif
 }

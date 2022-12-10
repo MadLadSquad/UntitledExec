@@ -106,6 +106,16 @@ void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 	kill(currentpid, SIGTERM);
 	wait(&currentpid);
 }
+
+bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, UExecStreams stream, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
+{
+	return false;
+}
+
+bool uexec::InternalUnix::writeUnix(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+{
+	return false;
+}
 #else
 int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 {
@@ -132,5 +142,15 @@ bool uexec::InternalUnix::finishedUnix(const ScriptRunner* const ctx) noexcept
 
 void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 {
+}
+
+bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, UExecStreams stream, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
+{
+	return false;
+}
+
+bool uexec::InternalUnix::writeUnix(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+{
+	return false;
 }
 #endif

@@ -1,6 +1,7 @@
 #include "uexecwindows.hpp"
 #include "uexec.hpp"
 
+#include <iostream>
 #ifdef _WIN32
 #include <windows.h>
 
@@ -55,41 +56,54 @@ int uexec::InternalWindows::initWindows(char* const* args, uint32_t size, Script
 	for (size_t i = 1; args[i] != nullptr; i++)
 		str += uexecstring(args[i]) + " ";
 	
-	STARTUPINFO si;
-	ZeroMemory(&si, sizeof(si));
-	ZeroMemory(&ctx->pif, sizeof(ctx->pif));
-	ZeroMemory(&ctx->process, sizeof(ctx->process));
-
-	// HOLY SHIT I CANNOT BELIEVE. Ok ok, so welcome to my TED talk, here I will talk about the confusion that is the Win32 C/C++ API and the absolute mental torment I went trough.
-	// Alright so HOW DID I MISS THE WHOLE OF STACK OVERFLOW WHEN TALKING ABOUT THIS. Ok so here's the issue, I started working on this library some time ago and I searched for a way
-	// to terminate a process. All of stack overflow said that I should use TerminateProcess and then close the handles, however for some reason this didn't close the process.
-	// Months after that I decided to shoot my shot again, didn't work. For hours on end, I was searching for the solution yet found nothing that works, tried opening the process with
-	// the PROCESS_TERMINATE flag, changed termination to the PID and even considered wrapping it in a job object. TURNS OUT ALL I NEEDED TO DO IS ADD THIS FLAG, YET MSDN AND STACKOVERFLOW
-	// HAD NOTHING TO SAY ABOUT IT. So... how did I found it. So I tested some stuff on ChatGPT and tried my luck, and I shit you not, the first answer gave me the solution
-	DWORD creationFlags = CREATE_NEW_CONSOLE;
-	si.cb = sizeof(si);
-	if (!CreateProcess(filename, str.data(), nullptr, nullptr, false, creationFlags, nullptr, nullptr, &si, &ctx->pif));
-	{
-		return -1;
-	}
-
 	SECURITY_ATTRIBUTES sa;
-	ZeroMemory(&sa, sizeof(sa));
-
 	sa.nLength = sizeof(SECURITY_ATTRIBUTES);
 	sa.bInheritHandle = true;
 	sa.lpSecurityDescriptor = nullptr;
+	
 
-	if (!CreatePipe(&ctx->pipefd[WIN_PIPE_READ], &ctx->pipefd[WIN_PIPE_WRITE], &sa, 0))
+	if (ctx->stderrOpen)
+		ctx->stderrOpen = CreatePipe(&ctx->stderrRead, &ctx->stderrWrite, &sa, 0);
+	if (ctx->stdoutOpen)
+		ctx->stdoutOpen = CreatePipe(&ctx->stdoutRead, &ctx->stdoutWrite, &sa, 0);
+	if (ctx->stdinOpen)
+		ctx->stdinOpen = CreatePipe(&ctx->stdinRead, &ctx->stdinWrite, &sa, 0);
+
+
+	// Create the child process
+	STARTUPINFO si;
+	ZeroMemory(&si, sizeof(STARTUPINFO));
+	si.cb = sizeof(STARTUPINFO);
+	
+	if (ctx->stderrOpen)
+		si.hStdError = ctx->stderrWrite;
+	if (ctx->stdoutOpen)
+		si.hStdOutput = ctx->stdoutWrite;
+	if (ctx->stdinOpen)
+		si.hStdInput = ctx->stdinRead;
+
+	si.dwFlags |= STARTF_USESTDHANDLES;
+	ZeroMemory(&ctx->pif, sizeof(PROCESS_INFORMATION));
+
+	//// HOLY SHIT I CANNOT BELIEVE. Ok ok, so welcome to my TED talk, here I will talk about the confusion that is the Win32 C/C++ API and the absolute mental torment I went trough.
+	//// Alright so HOW DID I MISS THE WHOLE OF STACK OVERFLOW WHEN TALKING ABOUT THIS. Ok so here's the issue, I started working on this library some time ago and I searched for a way
+	//// to terminate a process. All of stack overflow said that I should use TerminateProcess and then close the handles, however for some reason this didn't close the process.
+	//// Months after that I decided to shoot my shot again, didn't work. For hours on end, I was searching for the solution yet found nothing that works, tried opening the process with
+	//// the PROCESS_TERMINATE flag, changed termination to the PID and even considered wrapping it in a job object. TURNS OUT ALL I NEEDED TO DO IS ADD THIS FLAG, YET MSDN AND STACKOVERFLOW
+	//// HAD NOTHING TO SAY ABOUT IT. So... how did I found it. So I tested some stuff on ChatGPT and tried my luck, and I shit you not, the first answer gave me the solution
+	constexpr DWORD creationFlags = CREATE_NEW_CONSOLE;
+	if (!CreateProcess(filename, str.data(), nullptr, nullptr, true, creationFlags, nullptr, nullptr, &si, &ctx->pif))
 		return -1;
 
-	si.hStdOutput = ctx->pipefd[WIN_PIPE_WRITE];
-	si.hStdError = ctx->pipefd[WIN_PIPE_WRITE];
-	si.dwFlags = STARTF_USESTDHANDLES;
+	// Close the write ends of the pipes so we can read from them
+	if (ctx->stderrOpen)
+		CloseHandle(ctx->stderrWrite);
+	if (ctx->stdoutOpen)
+		CloseHandle(ctx->stdoutWrite);
+	if (ctx->stdinOpen)
+		CloseHandle(ctx->stdinRead);
 
-	if (!SetStdHandle(STD_OUTPUT_HANDLE, ctx->pipefd[WIN_PIPE_WRITE]) && !SetStdHandle(STD_ERROR_HANDLE, ctx->pipefd[WIN_PIPE_WRITE]))
-		return -1;
-
+	return 0;
 }
 
 void uexec::InternalWindows::updateWindows(bool bFirst, ScriptRunner* ctx) noexcept
@@ -104,9 +118,6 @@ void uexec::InternalWindows::updateWindows(bool bFirst, ScriptRunner* ctx) noexc
 void uexec::InternalWindows::destroyForReuseWindows(ScriptRunner* ctx) noexcept
 {
 	ctx->bFinished = false;
-	ctx->pipefd[0] = nullptr;
-	ctx->pipefd[1] = nullptr;
-	ctx->process = 0;
 }
 
 bool uexec::InternalWindows::finishedWindows(const ScriptRunner* const ctx) noexcept
@@ -116,15 +127,39 @@ bool uexec::InternalWindows::finishedWindows(const ScriptRunner* const ctx) noex
 
 void uexec::InternalWindows::terminateWindows(ScriptRunner* ctx) noexcept
 {
-	// Go to line 69 for angry assay
+	// Go to line 94 for angry assay
 	TerminateProcess(ctx->pif.hProcess, 0);
 
-	CloseHandle(ctx->pipefd[WIN_PIPE_READ]);
-	CloseHandle(ctx->pipefd[WIN_PIPE_WRITE]);
 	CloseHandle(ctx->pif.hThread);
 	CloseHandle(ctx->pif.hProcess);
-	
+
+	if (ctx->stderrOpen)
+		CloseHandle(ctx->stderrRead);
+	if (ctx->stdoutOpen)
+		CloseHandle(ctx->stdoutRead);
+	if (ctx->stdinOpen)
+		CloseHandle(ctx->stdinWrite);
+
 	ctx->bFinished = true;
+}
+
+bool uexec::InternalWindows::writeWindows(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+{
+	DWORD writeBytes;
+
+	auto result = WriteFile(ctx->stdinWrite, buffer.data(), buffer.size(), &writeBytes, nullptr);
+	bytesWritten = writeBytes;
+
+	return result;
+}
+
+bool uexec::InternalWindows::readWindows(ScriptRunner* ctx, void* fd, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
+{
+	DWORD readBytes;
+	
+	auto result = ReadFile(fd, buffer.data(), buffer.size(), &readBytes, nullptr);
+	bytesRead = readBytes;
+	return result;
 }
 
 #else
@@ -153,5 +188,15 @@ bool uexec::InternalWindows::finishedWindows(const ScriptRunner* const ctx) noex
 
 void uexec::InternalWindows::terminateWindows(ScriptRunner* ctx) noexcept
 {
+}
+
+bool uexec::InternalWindows::writeWindows(ScriptRunner* ctx, void* fd, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+{
+	return false;
+}
+
+bool uexec::InternalWindows::readWindows(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+{
+	return false;
 }
 #endif

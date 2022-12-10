@@ -1,9 +1,11 @@
 #pragma once
 #include <cinttypes>
+#include "uexec.hpp"
 
 namespace uexec
 {
 	class ScriptRunner;
+	enum UExecStreams;
 
 	class InternalWindows
 	{
@@ -17,5 +19,8 @@ namespace uexec
 		static void destroyForReuseWindows(ScriptRunner* ctx) noexcept;
 		static bool finishedWindows(const ScriptRunner* const ctx) noexcept;
 		static void terminateWindows(ScriptRunner* ctx) noexcept;
+
+		static bool writeWindows(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept;
+		static bool readWindows(ScriptRunner* ctx, void* fd, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept;
 	};
 }
