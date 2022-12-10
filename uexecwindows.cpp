@@ -163,7 +163,7 @@ bool uexec::InternalWindows::readWindows(ScriptRunner* ctx, void* fd, uexecstrin
 }
 
 #else
-int uexec::InternalWindows::execandwaitUnix(char* const* command) noexcept
+int uexec::InternalWindows::execandwaitWindows(char* const* command) noexcept
 {
 	return -1;
 }
