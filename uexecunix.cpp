@@ -147,7 +147,7 @@ void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 {
 }
 
-bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, void* pipe, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
+bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, int* pipe, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
 	return false;
 }
