@@ -4,9 +4,7 @@
 	#include <iostream>
 #else
 	#include <unistd.h>
-	#include <sys/wait.h>
 #endif
-#include <csignal>
 #include <chrono>
 
 #include "uexecunix.hpp"
@@ -21,20 +19,18 @@ int uexec::execandwait(char* const* command) noexcept
 #endif
 }
 
-int uexec::ScriptRunner::init(char* const* args, uint32_t size, bool bOpenStderrPipe, bool bOpenStdoutPipe, bool bOpenStdinPipe) noexcept
+int uexec::ScriptRunner::init(char* const* args, bool bOpenStderrPipe, bool bOpenStdoutPipe, bool bOpenStdinPipe) noexcept
 {
     bCanRestart = false;
-	stringBuffer.reserve(size);
-	bufferSize = size;
 
 	stderrOpen = bOpenStderrPipe;
 	stdoutOpen = bOpenStdoutPipe;
 	stdinOpen = bOpenStdinPipe;
 
 #ifdef _WIN32
-	return InternalWindows::initWindows(args, size, this);
+	return InternalWindows::initWindows(args, this);
 #else
-	return InternalUnix::initUnix(args, size, this);
+	return InternalUnix::initUnix(args, this);
 #endif
 }
 
@@ -44,22 +40,6 @@ void uexec::ScriptRunner::update(bool bFirst) noexcept
 	{	
 		InternalWindows::updateWindows(bFirst, this);
 		InternalUnix::updateUnix(bFirst, this);
-	}
-}
-
-void uexec::ScriptRunner::updateBufferSize() noexcept
-{
-	if (bCanUpdate)
-	{
-#ifndef _WIN32
-		if (pid > 0)
-		{
-#endif
-		stringBuffer.clear();
-		stringBuffer.reserve(bufferSize);
-#ifndef _WIN32
-		}
-#endif
 	}
 }
 
@@ -81,8 +61,6 @@ void uexec::ScriptRunner::destroyForReuse() noexcept
 	if (finished())
 	{
         bCanRestart = true;
-		stringBuffer.clear();
-		lineBuffer.clear();
 		bCanUpdate = false;
 		bValid = true;
 
@@ -98,11 +76,6 @@ bool uexec::ScriptRunner::finished() const noexcept
 #else
 	return InternalUnix::finishedUnix(this);
 #endif
-}
-
-std::vector<uexecstring>& uexec::ScriptRunner::data() noexcept
-{
-	return lineBuffer;
 }
 
 bool uexec::ScriptRunner::startable() const noexcept
@@ -121,7 +94,7 @@ bool uexec::ScriptRunner::readSTDOUT(uexecstring& buffer, size_t size, size_t& b
 #ifdef _WIN32
 	return InternalWindows::readWindows(this, stdoutRead, buffer, size, bytesRead);
 #else
-	return InternalUnix::readUnix(this, buffer, size, bytesRead);
+	return InternalUnix::readUnix(this, pipefdSTDOUT, buffer, size, bytesRead);
 #endif
 }
 
@@ -130,7 +103,7 @@ bool uexec::ScriptRunner::readSTDERR(uexecstring& buffer, size_t size, size_t& b
 #ifdef _WIN32
 	return InternalWindows::readWindows(this, stderrRead, buffer, size, bytesRead);
 #else
-	return InternalUnix::readUnix(this, buffer, size, bytesRead);
+	return InternalUnix::readUnix(this, pipefdSTDERR, buffer, size, bytesRead);
 #endif
 }
 

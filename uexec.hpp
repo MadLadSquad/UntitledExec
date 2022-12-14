@@ -16,33 +16,18 @@
 	#include <thread>
 #endif
 
-
-#define WIN_PIPE_READ 0
-#define WIN_PIPE_WRITE 1
-
-
 namespace uexec
 {
 	// An abstraction over execvp and wait
 	int execandwait(char* const* command) noexcept;
-	
-	enum UExecStreams
-	{
-		UEXEC_STREAM_STD_OUT,
-		UEXEC_STREAM_STD_IN,
-		UEXEC_STREAM_STD_ERR,
-
-	};
 
 	class ScriptRunner
 	{
 	public:
 		// Given an array, will start executing the script, will return -1 on failure
-		int init(char* const* args, uint32_t size, bool bOpenStderrPipe = false, bool bOpenStdoutPipe = false, bool bOpenStdinPipe = false) noexcept;
+		int init(char* const* args, bool bOpenStderrPipe = false, bool bOpenStdoutPipe = false, bool bOpenStdinPipe = false) noexcept;
 		// Updates the buffer stream, call this with true the first time
 		void update(bool bFirst = false) noexcept;
-		// Will update the size of the buffer
-		void updateBufferSize() noexcept;
 		// Destroys the runner
 		void destroy() noexcept;
 		[[nodiscard]] bool valid() const noexcept;
@@ -50,7 +35,6 @@ namespace uexec
 		void destroyForReuse() noexcept;
 		[[nodiscard]] bool finished() const noexcept;
         [[nodiscard]] bool startable() const noexcept;
-		std::vector<uexecstring>& data() noexcept;
 
         // Terminates the process, use the destroy functions after calling terminate!
         void terminate() noexcept;
@@ -64,27 +48,25 @@ namespace uexec
 	private:
 		friend class InternalUnix;
 		friend class InternalWindows;
-
-		std::vector<uexecstring> lineBuffer;	// The buffer of lines
 #ifdef _WIN32
 		PROCESS_INFORMATION pif;				// The process information struct, contains a handle to the process
 		HANDLE stderrRead, stdoutRead, stdinRead;
 		HANDLE stderrWrite, stdoutWrite, stdinWrite;
 
-		bool stderrOpen = false;
-		bool stdoutOpen = false;
-		bool stdinOpen = false;
-
 		bool bFinished = false;					// This indicates whether the process has finished executing in order to destroy it
 #else
-		int pipefd[2]; // pipe file descriptors
+        int pipefdSTDIN[2]{};
+		int pipefdSTDOUT[2]{};
+        int pipefdSTDERR[2]{};
 		int pid = -1;
 #endif
-		uexecstring stringBuffer;
-		bool bCanUpdate = false;
+        bool stderrOpen = false;
+        bool stdoutOpen = false;
+        bool stdinOpen = false;
+
+        bool bCanUpdate = false;
 		bool bValid = true;
         bool bCanRestart = true;
-		uint32_t bufferSize = 128;
 	};
 
 #ifndef _WIN32

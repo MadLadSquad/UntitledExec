@@ -40,7 +40,7 @@ int uexec::InternalWindows::execandwaitWindows(char* const* command) noexcept
 	return 0;
 }
 
-int uexec::InternalWindows::initWindows(char* const* args, uint32_t size, ScriptRunner* ctx) noexcept
+int uexec::InternalWindows::initWindows(char* const* args, ScriptRunner* ctx) noexcept
 {
 	//bool bSuccess = CreatePipe(pipehandles[0], pipehandles[2], nullptr, 0);
 	uexecstring ext = args[0];
@@ -168,7 +168,7 @@ int uexec::InternalWindows::execandwaitWindows(char* const* command) noexcept
 	return -1;
 }
 
-int uexec::InternalWindows::initWindows(char* const* command, uint32_t size, ScriptRunner* ctx) noexcept
+int uexec::InternalWindows::initWindows(char* const* command, ScriptRunner* ctx) noexcept
 {
 	return -1;
 }
@@ -190,12 +190,12 @@ void uexec::InternalWindows::terminateWindows(ScriptRunner* ctx) noexcept
 {
 }
 
-bool uexec::InternalWindows::writeWindows(ScriptRunner* ctx, void* fd, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+bool uexec::InternalWindows::writeWindows(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
 {
 	return false;
 }
 
-bool uexec::InternalWindows::readWindows(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
+bool uexec::InternalWindows::readWindows(ScriptRunner* ctx, void* fd, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
 	return false;
 }

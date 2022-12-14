@@ -5,7 +5,6 @@
 namespace uexec
 {
 	class ScriptRunner;
-	enum UExecStreams;
 
 	class InternalWindows
 	{
@@ -14,10 +13,10 @@ namespace uexec
 	private:
 		friend class ScriptRunner;
 		
-		static int initWindows(char* const* args, uint32_t size, ScriptRunner* ctx) noexcept;
+		static int initWindows(char* const* args, ScriptRunner* ctx) noexcept;
 		static void updateWindows(bool bFirst, ScriptRunner* ctx) noexcept;
 		static void destroyForReuseWindows(ScriptRunner* ctx) noexcept;
-		static bool finishedWindows(const ScriptRunner* const ctx) noexcept;
+		static bool finishedWindows(const ScriptRunner* ctx) noexcept;
 		static void terminateWindows(ScriptRunner* ctx) noexcept;
 
 		static bool writeWindows(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept;

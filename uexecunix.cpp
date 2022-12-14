@@ -1,11 +1,22 @@
 #include "uexecunix.hpp"
-#include <iostream>
-#include <csignal>
 #include "uexec.hpp"
 
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/wait.h>
+
+
+namespace uexec
+{
+    // This function basically closes the first end of the pipe, duplicates it to the second and closes the second to
+    // the child process so that the parent can use it
+    void initDescriptors(int* fd, const int file, int fclose, int sclose) noexcept
+    {
+        close(fd[fclose]);
+        dup2(fd[sclose], file);
+        close(fd[sclose]);
+    }
+}
 
 
 int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
@@ -23,7 +34,7 @@ int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 	return 0;
 }
 
-int uexec::InternalUnix::initUnix(char* const* args, uint32_t size, ScriptRunner* ctx) noexcept
+int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 {
 	ctx->pid = fork();
 	if (ctx->pid != -1)
@@ -31,12 +42,12 @@ int uexec::InternalUnix::initUnix(char* const* args, uint32_t size, ScriptRunner
 		currentpid = ctx->pid;
 		if (ctx->pid == 0)
 		{
-			close(ctx->pipefd[0]);
-
-			dup2(ctx->pipefd[1], STDOUT_FILENO);
-			dup2(ctx->pipefd[1], STDERR_FILENO);
-
-			close(ctx->pipefd[1]);
+            if (ctx->stdoutOpen)
+                initDescriptors(ctx->pipefdSTDOUT, STDOUT_FILENO, 0, 1);
+            if (ctx->stderrOpen)
+                initDescriptors(ctx->pipefdSTDERR, STDERR_FILENO, 0, 1);
+            if (ctx->stdinOpen)
+                initDescriptors(ctx->pipefdSTDIN, STDIN_FILENO, 1, 0);
 
 			execvp(args[0], args);
 			wait(&currentpid);
@@ -63,37 +74,27 @@ int uexec::InternalUnix::initUnix(char* const* args, uint32_t size, ScriptRunner
 
 void uexec::InternalUnix::updateUnix(bool bFirst, ScriptRunner* ctx) noexcept
 {
-	if (ctx->pid > 0)
-	{
-		std::vector<char> buf;
-		buf.reserve(ctx->bufferSize);
-		if (bFirst)
-			close(ctx->pipefd[1]);
-		if (read(ctx->pipefd[0], buf.data(), sizeof(buf.data())) != 0)
-		{
-			uexecstring tmp = buf.data();
-			tmp.shrink_to_fit();
-			ctx->stringBuffer += tmp;
-			uexecstring accumulate;
-			for (auto& a : ctx->stringBuffer)
-			{
-				if (a == '\n')
-				{
-					ctx->lineBuffer.push_back(accumulate);
-					accumulate.clear();
-				}
-				else
-					accumulate += a;
-			}
-		}
-	}
+	if (ctx->pid > 0 && bFirst)
+    {
+        if (ctx->stdoutOpen)
+            close(ctx->pipefdSTDOUT[1]);
+        if (ctx->stderrOpen)
+            close(ctx->pipefdSTDERR[1]);
+        if (ctx->stdinOpen)
+            close(ctx->pipefdSTDIN[0]);
+    }
 }
 
 void uexec::InternalUnix::destroyForReuseUnix(ScriptRunner* ctx) noexcept
 {
 	ctx->pid = -1;
-	ctx->pipefd[0] = -1;
-	ctx->pipefd[1] = -1;
+	ctx->pipefdSTDOUT[0] = -1;
+	ctx->pipefdSTDOUT[1] = -1;
+    ctx->pipefdSTDERR[0] = -1;
+    ctx->pipefdSTDERR[1] = -1;
+    ctx->pipefdSTDIN[0] = -1;
+    ctx->pipefdSTDIN[1] = -1;
+
 }
 
 bool uexec::InternalUnix::finishedUnix(const ScriptRunner* const ctx) noexcept
@@ -107,14 +108,16 @@ void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 	wait(&currentpid);
 }
 
-bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, UExecStreams stream, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
+bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, int* pipe, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
-	return false;
+	bytesRead = read(pipe[0], buffer.data(), size);
+    return bytesRead;
 }
 
 bool uexec::InternalUnix::writeUnix(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
 {
-	return false;
+	bytesWritten = write(ctx->pipefdSTDIN[0], buffer.data(), size);
+    return bytesWritten;
 }
 #else
 int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
@@ -122,7 +125,7 @@ int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 	return -1;
 }
 
-int uexec::InternalUnix::initUnix(char* const* args, uint32_t size, ScriptRunner* ctx) noexcept
+int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 {
 	return -1;
 }
@@ -144,7 +147,7 @@ void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 {
 }
 
-bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, UExecStreams stream, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
+bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, void* pipe, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
 	return false;
 }
