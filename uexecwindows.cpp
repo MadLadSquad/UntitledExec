@@ -111,7 +111,7 @@ void uexec::InternalWindows::updateWindows(ScriptRunner* ctx) noexcept
 	if (WaitForSingleObject(ctx->data.pif.hProcess, 0) != WAIT_TIMEOUT)
 	{
 		WaitForSingleObject(ctx->data.pif.hProcess, INFINITE);
-		ctx->data.terminate();
+		ctx->terminate();
 	}
 }
 
