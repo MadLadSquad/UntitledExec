@@ -136,10 +136,6 @@ int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 	return -1;
 }
 
-void uexec::InternalUnix::updateUnix(bool bFirst, ScriptRunner* ctx) noexcept
-{
-}
-
 void uexec::InternalUnix::destroyForReuseUnix(ScriptRunner* ctx) noexcept
 {
 }
