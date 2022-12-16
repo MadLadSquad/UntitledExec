@@ -14,7 +14,7 @@ namespace uexec
 		friend class ScriptRunner;
 		
 		static int initWindows(char* const* args, ScriptRunner* ctx) noexcept;
-		static void updateWindows(bool bFirst, ScriptRunner* ctx) noexcept;
+		static void updateWindows(ScriptRunner* ctx) noexcept;
 		static void destroyForReuseWindows(ScriptRunner* ctx) noexcept;
 		static bool finishedWindows(const ScriptRunner* ctx) noexcept;
 		static void terminateWindows(ScriptRunner* ctx) noexcept;

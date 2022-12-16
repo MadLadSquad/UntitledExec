@@ -62,12 +62,12 @@ int uexec::InternalWindows::initWindows(char* const* args, ScriptRunner* ctx) no
 	sa.lpSecurityDescriptor = nullptr;
 	
 
-	if (ctx->stderrOpen)
-		ctx->stderrOpen = CreatePipe(&ctx->stderrRead, &ctx->stderrWrite, &sa, 0);
-	if (ctx->stdoutOpen)
-		ctx->stdoutOpen = CreatePipe(&ctx->stdoutRead, &ctx->stdoutWrite, &sa, 0);
-	if (ctx->stdinOpen)
-		ctx->stdinOpen = CreatePipe(&ctx->stdinRead, &ctx->stdinWrite, &sa, 0);
+	if (ctx->data.stderrOpen)
+		ctx->data.stderrOpen = CreatePipe(&ctx->data.stderrRead, &ctx->data.stderrWrite, &sa, 0);
+	if (ctx->data.stdoutOpen)
+		ctx->data.stdoutOpen = CreatePipe(&ctx->data.stdoutRead, &ctx->data.stdoutWrite, &sa, 0);
+	if (ctx->data.stdinOpen)
+		ctx->data.stdinOpen = CreatePipe(&ctx->data.stdinRead, &ctx->data.stdinWrite, &sa, 0);
 
 
 	// Create the child process
@@ -75,15 +75,15 @@ int uexec::InternalWindows::initWindows(char* const* args, ScriptRunner* ctx) no
 	ZeroMemory(&si, sizeof(STARTUPINFO));
 	si.cb = sizeof(STARTUPINFO);
 	
-	if (ctx->stderrOpen)
-		si.hStdError = ctx->stderrWrite;
-	if (ctx->stdoutOpen)
-		si.hStdOutput = ctx->stdoutWrite;
-	if (ctx->stdinOpen)
-		si.hStdInput = ctx->stdinRead;
+	if (ctx->data.stderrOpen)
+		si.hStdError = ctx->data.stderrWrite;
+	if (ctx->data.stdoutOpen)
+		si.hStdOutput = ctx->data.stdoutWrite;
+	if (ctx->data.stdinOpen)
+		si.hStdInput = ctx->data.stdinRead;
 
 	si.dwFlags |= STARTF_USESTDHANDLES;
-	ZeroMemory(&ctx->pif, sizeof(PROCESS_INFORMATION));
+	ZeroMemory(&ctx->data.pif, sizeof(PROCESS_INFORMATION));
 
 	//// HOLY SHIT I CANNOT BELIEVE. Ok ok, so welcome to my TED talk, here I will talk about the confusion that is the Win32 C/C++ API and the absolute mental torment I went trough.
 	//// Alright so HOW DID I MISS THE WHOLE OF STACK OVERFLOW WHEN TALKING ABOUT THIS. Ok so here's the issue, I started working on this library some time ago and I searched for a way
@@ -92,32 +92,32 @@ int uexec::InternalWindows::initWindows(char* const* args, ScriptRunner* ctx) no
 	//// the PROCESS_TERMINATE flag, changed termination to the PID and even considered wrapping it in a job object. TURNS OUT ALL I NEEDED TO DO IS ADD THIS FLAG, YET MSDN AND STACKOVERFLOW
 	//// HAD NOTHING TO SAY ABOUT IT. So... how did I found it. So I tested some stuff on ChatGPT and tried my luck, and I shit you not, the first answer gave me the solution
 	constexpr DWORD creationFlags = CREATE_NEW_CONSOLE;
-	if (!CreateProcess(filename, str.data(), nullptr, nullptr, true, creationFlags, nullptr, nullptr, &si, &ctx->pif))
+	if (!CreateProcess(filename, str.data(), nullptr, nullptr, true, creationFlags, nullptr, nullptr, &si, &ctx->data.pif))
 		return -1;
 
 	// Close the write ends of the pipes so we can read from them
-	if (ctx->stderrOpen)
-		CloseHandle(ctx->stderrWrite);
-	if (ctx->stdoutOpen)
-		CloseHandle(ctx->stdoutWrite);
-	if (ctx->stdinOpen)
-		CloseHandle(ctx->stdinRead);
+	if (ctx->data.stderrOpen)
+		CloseHandle(ctx->data.stderrWrite);
+	if (ctx->data.stdoutOpen)
+		CloseHandle(ctx->data.stdoutWrite);
+	if (ctx->data.stdinOpen)
+		CloseHandle(ctx->data.stdinRead);
 
 	return 0;
 }
 
-void uexec::InternalWindows::updateWindows(bool bFirst, ScriptRunner* ctx) noexcept
+void uexec::InternalWindows::updateWindows(ScriptRunner* ctx) noexcept
 {
-	if (WaitForSingleObject(ctx->pif.hProcess, 0) != WAIT_TIMEOUT)
+	if (WaitForSingleObject(ctx->data.pif.hProcess, 0) != WAIT_TIMEOUT)
 	{
-		WaitForSingleObject(ctx->pif.hProcess, INFINITE);
-		ctx->terminate();
+		WaitForSingleObject(ctx->data.pif.hProcess, INFINITE);
+		ctx->data.terminate();
 	}
 }
 
 void uexec::InternalWindows::destroyForReuseWindows(ScriptRunner* ctx) noexcept
 {
-	ctx->bFinished = false;
+	ctx->data.bFinished = false;
 }
 
 bool uexec::InternalWindows::finishedWindows(const ScriptRunner* const ctx) noexcept
@@ -128,26 +128,26 @@ bool uexec::InternalWindows::finishedWindows(const ScriptRunner* const ctx) noex
 void uexec::InternalWindows::terminateWindows(ScriptRunner* ctx) noexcept
 {
 	// Go to line 94 for angry assay
-	TerminateProcess(ctx->pif.hProcess, 0);
+	TerminateProcess(ctx->data.pif.hProcess, 0);
 
-	CloseHandle(ctx->pif.hThread);
-	CloseHandle(ctx->pif.hProcess);
+	CloseHandle(ctx->data.pif.hThread);
+	CloseHandle(ctx->data.pif.hProcess);
 
-	if (ctx->stderrOpen)
-		CloseHandle(ctx->stderrRead);
-	if (ctx->stdoutOpen)
-		CloseHandle(ctx->stdoutRead);
-	if (ctx->stdinOpen)
-		CloseHandle(ctx->stdinWrite);
+	if (ctx->data.stderrOpen)
+		CloseHandle(ctx->data.stderrRead);
+	if (ctx->data.stdoutOpen)
+		CloseHandle(ctx->data.stdoutRead);
+	if (ctx->data.stdinOpen)
+		CloseHandle(ctx->data.stdinWrite);
 
-	ctx->bFinished = true;
+	ctx->data.bFinished = true;
 }
 
 bool uexec::InternalWindows::writeWindows(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
 {
 	DWORD writeBytes;
 
-	auto result = WriteFile(ctx->stdinWrite, buffer.data(), buffer.size(), &writeBytes, nullptr);
+	auto result = WriteFile(ctx->data.stdinWrite, buffer.data(), buffer.size(), &writeBytes, nullptr);
 	bytesWritten = writeBytes;
 
 	return result;
@@ -173,7 +173,7 @@ int uexec::InternalWindows::initWindows(char* const* command, ScriptRunner* ctx)
 	return -1;
 }
 
-void uexec::InternalWindows::updateWindows(bool bFirst, ScriptRunner* ctx) noexcept
+void uexec::InternalWindows::updateWindows(ScriptRunner* ctx) noexcept
 {
 }
 

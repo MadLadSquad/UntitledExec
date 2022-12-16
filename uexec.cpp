@@ -5,7 +5,6 @@
 #else
 	#include <unistd.h>
 #endif
-#include <chrono>
 
 #include "uexecunix.hpp"
 #include "uexecwindows.hpp"
@@ -21,11 +20,23 @@ int uexec::execandwait(char* const* command) noexcept
 
 int uexec::ScriptRunner::init(char* const* args, bool bOpenStderrPipe, bool bOpenStdoutPipe, bool bOpenStdinPipe) noexcept
 {
-    bCanRestart = false;
+#ifndef _WIN32
+	data.pid = -1;
+	data.stderrOpen = false;
+	data.stdoutOpen = false;
+	data.stdinOpen = false;
 
-	stderrOpen = bOpenStderrPipe;
-	stdoutOpen = bOpenStdoutPipe;
-	stdinOpen = bOpenStdinPipe;
+	data.bCanUpdate = false;
+	data.bValid = true;
+	data.bCanRestart = true;
+#else
+	data.bFinished = false;
+#endif
+    data.bCanRestart = false;
+
+	data.stderrOpen = bOpenStderrPipe;
+    data.stdoutOpen = bOpenStdoutPipe;
+    data.stdinOpen = bOpenStdinPipe;
 
 #ifdef _WIN32
 	return InternalWindows::initWindows(args, this);
@@ -34,35 +45,32 @@ int uexec::ScriptRunner::init(char* const* args, bool bOpenStderrPipe, bool bOpe
 #endif
 }
 
-void uexec::ScriptRunner::update(bool bFirst) noexcept
+void uexec::ScriptRunner::update() noexcept
 {
-	if (bCanUpdate)
-	{	
-		InternalWindows::updateWindows(bFirst, this);
-		InternalUnix::updateUnix(bFirst, this);
-	}
+	if (data.bCanUpdate)
+		InternalWindows::updateWindows(this);
 }
 
 void uexec::ScriptRunner::destroy() noexcept
 {
 	if (finished())
-		bValid = false;
+        data.bValid = false;
 	else
 		terminate();
 }
 
 bool uexec::ScriptRunner::valid() const noexcept
 {
-	return bValid;
+	return data.bValid;
 }
 
 void uexec::ScriptRunner::destroyForReuse() noexcept
 {
 	if (finished())
 	{
-        bCanRestart = true;
-		bCanUpdate = false;
-		bValid = true;
+        data.bCanRestart = true;
+		data.bCanUpdate = false;
+		data.bValid = true;
 
 		InternalWindows::destroyForReuseWindows(this);
 		InternalUnix::destroyForReuseUnix(this);
@@ -72,7 +80,7 @@ void uexec::ScriptRunner::destroyForReuse() noexcept
 bool uexec::ScriptRunner::finished() const noexcept
 {
 #ifdef _WIN32
-	return bFinished;
+	return data.bFinished;
 #else
 	return InternalUnix::finishedUnix(this);
 #endif
@@ -80,7 +88,7 @@ bool uexec::ScriptRunner::finished() const noexcept
 
 bool uexec::ScriptRunner::startable() const noexcept
 {
-    return bCanRestart;
+    return data.bCanRestart;
 }
 
 void uexec::ScriptRunner::terminate() noexcept
@@ -92,18 +100,18 @@ void uexec::ScriptRunner::terminate() noexcept
 bool uexec::ScriptRunner::readSTDOUT(uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
 #ifdef _WIN32
-	return InternalWindows::readWindows(this, stdoutRead, buffer, size, bytesRead);
+	return InternalWindows::readWindows(this, data.stdoutRead, buffer, size, bytesRead);
 #else
-	return InternalUnix::readUnix(this, pipefdSTDOUT, buffer, size, bytesRead);
+	return InternalUnix::readUnix(this, data.pipefdSTDOUT, buffer, size, bytesRead);
 #endif
 }
 
 bool uexec::ScriptRunner::readSTDERR(uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
 #ifdef _WIN32
-	return InternalWindows::readWindows(this, stderrRead, buffer, size, bytesRead);
+	return InternalWindows::readWindows(this, data.stderrRead, buffer, size, bytesRead);
 #else
-	return InternalUnix::readUnix(this, pipefdSTDERR, buffer, size, bytesRead);
+	return InternalUnix::readUnix(this, data.pipefdSTDERR, buffer, size, bytesRead);
 #endif
 }
 

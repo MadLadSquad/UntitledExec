@@ -16,6 +16,8 @@
 	#include <thread>
 #endif
 
+#include "uexecdata.h"
+
 namespace uexec
 {
 	// An abstraction over execvp and wait
@@ -27,7 +29,7 @@ namespace uexec
 		// Given an array, will start executing the script, will return -1 on failure
 		int init(char* const* args, bool bOpenStderrPipe = false, bool bOpenStdoutPipe = false, bool bOpenStdinPipe = false) noexcept;
 		// Updates the buffer stream, call this with true the first time
-		void update(bool bFirst = false) noexcept;
+		void update() noexcept;
 		// Destroys the runner
 		void destroy() noexcept;
 		[[nodiscard]] bool valid() const noexcept;
@@ -48,27 +50,9 @@ namespace uexec
 	private:
 		friend class InternalUnix;
 		friend class InternalWindows;
-#ifdef _WIN32
-		PROCESS_INFORMATION pif;				// The process information struct, contains a handle to the process
-		HANDLE stderrRead, stdoutRead, stdinRead;
-		HANDLE stderrWrite, stdoutWrite, stdinWrite;
 
-		bool bFinished = false;					// This indicates whether the process has finished executing in order to destroy it
-#else
-        int pipefdSTDIN[2]{};
-		int pipefdSTDOUT[2]{};
-        int pipefdSTDERR[2]{};
-		int pid = -1;
-#endif
-        bool stderrOpen = false;
-        bool stdoutOpen = false;
-        bool stdinOpen = false;
-
-        bool bCanUpdate = false;
-		bool bValid = true;
-        bool bCanRestart = true;
+		RunnerData data;
 	};
-
 #ifndef _WIN32
 	inline int currentpid = -1;
 #endif

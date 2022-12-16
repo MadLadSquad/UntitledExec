@@ -15,7 +15,6 @@ namespace uexec
 		friend class ScriptRunner;
 
 		static int initUnix(char* const* args, ScriptRunner* ctx) noexcept;
-		static void updateUnix(bool bFirst, ScriptRunner* ctx) noexcept;
 		static void destroyForReuseUnix(ScriptRunner* ctx) noexcept;
 		static bool finishedUnix(const ScriptRunner* ctx) noexcept;
 		static void terminateUnix(ScriptRunner* ctx) noexcept;

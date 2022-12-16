@@ -16,6 +16,13 @@ namespace uexec
         dup2(fd[sclose], file);
         close(fd[sclose]);
     }
+
+    void initPipes(int* fd, bool& bOpen) noexcept
+    {
+        if (bOpen)
+            if (pipe(fd) < 0)
+                bOpen = false;
+    }
 }
 
 
@@ -36,25 +43,37 @@ int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 
 int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 {
-	ctx->pid = fork();
-	if (ctx->pid != -1)
+    initPipes(ctx->data.pipefdSTDOUT, ctx->data.stdoutOpen);
+    initPipes(ctx->data.pipefdSTDERR, ctx->data.stderrOpen);
+    initPipes(ctx->data.pipefdSTDIN, ctx->data.stdinOpen);
+
+
+	ctx->data.pid = fork();
+	if (ctx->data.pid != -1)
 	{
-		currentpid = ctx->pid;
-		if (ctx->pid == 0)
+		currentpid = ctx->data.pid;
+		if (ctx->data.pid == 0)
 		{
-            if (ctx->stdoutOpen)
-                initDescriptors(ctx->pipefdSTDOUT, STDOUT_FILENO, 0, 1);
-            if (ctx->stderrOpen)
-                initDescriptors(ctx->pipefdSTDERR, STDERR_FILENO, 0, 1);
-            if (ctx->stdinOpen)
-                initDescriptors(ctx->pipefdSTDIN, STDIN_FILENO, 1, 0);
+            if (ctx->data.stdoutOpen)
+                initDescriptors(ctx->data.pipefdSTDOUT, STDOUT_FILENO, 0, 1);
+            if (ctx->data.stderrOpen)
+                initDescriptors(ctx->data.pipefdSTDERR, STDERR_FILENO, 0, 1);
+            if (ctx->data.stdinOpen)
+                initDescriptors(ctx->data.pipefdSTDIN, STDIN_FILENO, 1, 0);
 
 			execvp(args[0], args);
 			wait(&currentpid);
 		}
 		else
 		{
-			ctx->bCanUpdate = true;
+            if (ctx->data.stdoutOpen)
+                close(ctx->data.pipefdSTDOUT[1]);
+            if (ctx->data.stderrOpen)
+                close(ctx->data.pipefdSTDERR[1]);
+            if (ctx->data.stdinOpen)
+                close(ctx->data.pipefdSTDIN[0]);
+
+			ctx->data.bCanUpdate = true;
 			signal(SIGCHLD, [](int sig)
 			{
 				if (currentpid > 0)
@@ -72,34 +91,21 @@ int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 	return 0;
 }
 
-void uexec::InternalUnix::updateUnix(bool bFirst, ScriptRunner* ctx) noexcept
-{
-	if (ctx->pid > 0 && bFirst)
-    {
-        if (ctx->stdoutOpen)
-            close(ctx->pipefdSTDOUT[1]);
-        if (ctx->stderrOpen)
-            close(ctx->pipefdSTDERR[1]);
-        if (ctx->stdinOpen)
-            close(ctx->pipefdSTDIN[0]);
-    }
-}
-
 void uexec::InternalUnix::destroyForReuseUnix(ScriptRunner* ctx) noexcept
 {
-	ctx->pid = -1;
-	ctx->pipefdSTDOUT[0] = -1;
-	ctx->pipefdSTDOUT[1] = -1;
-    ctx->pipefdSTDERR[0] = -1;
-    ctx->pipefdSTDERR[1] = -1;
-    ctx->pipefdSTDIN[0] = -1;
-    ctx->pipefdSTDIN[1] = -1;
+	ctx->data.pid = -1;
+	ctx->data.pipefdSTDOUT[0] = -1;
+	ctx->data.pipefdSTDOUT[1] = -1;
+    ctx->data.pipefdSTDERR[0] = -1;
+    ctx->data.pipefdSTDERR[1] = -1;
+    ctx->data.pipefdSTDIN[0] = -1;
+    ctx->data.pipefdSTDIN[1] = -1;
 
 }
 
 bool uexec::InternalUnix::finishedUnix(const ScriptRunner* const ctx) noexcept
 {
-	return (ctx->bCanUpdate && currentpid == -1 ? true : false);
+	return (ctx->data.bCanUpdate && currentpid == -1 ? true : false);
 }
 
 void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
@@ -116,7 +122,7 @@ bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, int* pipe, uexecstring& bu
 
 bool uexec::InternalUnix::writeUnix(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
 {
-	bytesWritten = write(ctx->pipefdSTDIN[0], buffer.data(), size);
+	bytesWritten = write(ctx->data.pipefdSTDIN[0], buffer.data(), size);
     return bytesWritten;
 }
 #else
