@@ -36,4 +36,5 @@
 build/
 cmake-build-*/
 main.cpp
-CMakeLists.txt
+main.c
+CMakeLists*.txt

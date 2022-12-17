@@ -8,6 +8,9 @@ extern "C"
         #include <windows.h>
     #endif
 
+#ifndef __cplusplus
+typedef unsigned char bool;
+#endif
 
     struct RunnerData
     {
