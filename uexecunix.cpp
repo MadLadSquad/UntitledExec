@@ -146,6 +146,7 @@ void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 	return execonparent<void>(ctx, [](ScriptRunner* ctx) -> void {
 		kill(*ctx->data.pidp, SIGTERM);
 		wait(ctx->data.pidp);
+		*ctx->data.pidp = -1;
 	});
 }
 

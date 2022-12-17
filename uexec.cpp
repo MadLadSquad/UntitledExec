@@ -27,7 +27,6 @@ int uexec::ScriptRunner::init(char* const* args, bool bOpenStderrPipe, bool bOpe
 
 	data.bCanUpdate = false;
 	data.bValid = true;
-	data.bCanRestart = true;
 #else
 	data.bFinished = false;
 #endif
@@ -55,7 +54,10 @@ void uexec::ScriptRunner::destroy() noexcept
 	if (finished())
         data.bValid = false;
 	else
+	{
 		terminate();
+		data.bValid = false;
+	}
 }
 
 bool uexec::ScriptRunner::valid() const noexcept
@@ -65,15 +67,15 @@ bool uexec::ScriptRunner::valid() const noexcept
 
 void uexec::ScriptRunner::destroyForReuse() noexcept
 {
-	if (finished())
-	{
-        data.bCanRestart = true;
-		data.bCanUpdate = false;
-		data.bValid = true;
+	if (!finished())
+		destroy();
 
-		InternalWindows::destroyForReuseWindows(this);
-		InternalUnix::destroyForReuseUnix(this);
-	}
+	data.bCanRestart = true;
+	data.bCanUpdate = false;
+	data.bValid = true;
+
+	InternalWindows::destroyForReuseWindows(this);
+	InternalUnix::destroyForReuseUnix(this);
 }
 
 bool uexec::ScriptRunner::finished() const noexcept
