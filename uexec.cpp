@@ -21,7 +21,6 @@ int uexec::execandwait(char* const* command) noexcept
 int uexec::ScriptRunner::init(char* const* args, bool bOpenStderrPipe, bool bOpenStdoutPipe, bool bOpenStdinPipe) noexcept
 {
 #ifndef _WIN32
-	data.pid = -1;
 	data.stderrOpen = false;
 	data.stdoutOpen = false;
 	data.stdinOpen = false;

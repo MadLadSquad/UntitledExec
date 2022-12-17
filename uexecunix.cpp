@@ -4,7 +4,8 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/wait.h>
-
+#include <signal.h>
+#include <functional>
 
 namespace uexec
 {
@@ -23,6 +24,19 @@ namespace uexec
             if (pipe(fd) < 0)
                 bOpen = false;
     }
+
+	template<typename T>
+	T execonparent(ScriptRunner* ctx, const std::function<T(ScriptRunner*)>& func)
+	{
+		bool bFailedCheck = false;
+		for (auto& pid : uexec_internal_pids_do_not_touch)
+			if (pid == 0)
+				bFailedCheck = true;
+		if (!bFailedCheck)
+			return func(ctx);
+		else
+			while (true); // This is here so that we can completely block the event
+	}
 }
 
 
@@ -43,57 +57,70 @@ int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 
 int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 {
-    initPipes(ctx->data.pipefdSTDOUT, ctx->data.stdoutOpen);
-    initPipes(ctx->data.pipefdSTDERR, ctx->data.stderrOpen);
-    initPipes(ctx->data.pipefdSTDIN, ctx->data.stdinOpen);
-
-
-	ctx->data.pid = fork();
-	if (ctx->data.pid != -1)
+	return execonparent<int>(ctx, [&](ScriptRunner* ctx) -> int
 	{
-		currentpid = ctx->data.pid;
-		if (ctx->data.pid == 0)
-		{
-            if (ctx->data.stdoutOpen)
-                initDescriptors(ctx->data.pipefdSTDOUT, STDOUT_FILENO, 0, 1);
-            if (ctx->data.stderrOpen)
-                initDescriptors(ctx->data.pipefdSTDERR, STDERR_FILENO, 0, 1);
-            if (ctx->data.stdinOpen)
-                initDescriptors(ctx->data.pipefdSTDIN, STDIN_FILENO, 1, 0);
+		initPipes(ctx->data.pipefdSTDOUT, ctx->data.stdoutOpen);
+		initPipes(ctx->data.pipefdSTDERR, ctx->data.stderrOpen);
+		initPipes(ctx->data.pipefdSTDIN, ctx->data.stdinOpen);
 
-			execvp(args[0], args);
-			wait(&currentpid);
+		ctx->data.pidpos = uexec_internal_pids_do_not_touch.size();
+		uexec_internal_pids_do_not_touch.push_back(fork());
+		ctx->data.pidp = &uexec_internal_pids_do_not_touch.back();
+
+		auto pid = *ctx->data.pidp;
+		if (pid != -1)
+		{
+			if (pid == 0)
+			{
+				if (ctx->data.stdoutOpen)
+					initDescriptors(ctx->data.pipefdSTDOUT, STDOUT_FILENO, 0, 1);
+				if (ctx->data.stderrOpen)
+					initDescriptors(ctx->data.pipefdSTDERR, STDERR_FILENO, 0, 1);
+				if (ctx->data.stdinOpen)
+					initDescriptors(ctx->data.pipefdSTDIN, STDIN_FILENO, 1, 0);
+
+				execvp(args[0], args);
+				wait(&pid);
+			}
+			else
+			{
+				if (ctx->data.stdoutOpen)
+					close(ctx->data.pipefdSTDOUT[1]);
+				if (ctx->data.stderrOpen)
+					close(ctx->data.pipefdSTDERR[1]);
+				if (ctx->data.stdinOpen)
+					close(ctx->data.pipefdSTDIN[0]);
+
+				ctx->data.bCanUpdate = true;
+				struct sigaction actiondt{};
+				// Signal handler for SIGCHLD, basically if the child sends this its execution has ended, so we need
+				// to destroy it. However, you might notice that we don't modify the internal pid manager to remove the
+				// useless PID. That's because if we did that there is no way for the instance that owns the PID to know
+				// if it has died. Instead, the user himself has to handle destruction. This should be achieved by
+				// continually querying "finished" then calling "destroyForReuse" on fail
+				actiondt.sa_sigaction = [](int signal, siginfo_t* info, void* next) -> void {
+					for (int& a : uexec_internal_pids_do_not_touch)
+					{
+						if (a == info->si_pid)
+						{
+							wait(&a);
+							a = -1;
+							break;
+						}
+					}
+				};
+				actiondt.sa_flags = SA_SIGINFO;
+				sigaction(SIGCHLD, &actiondt, nullptr);
+			}
 		}
 		else
-		{
-            if (ctx->data.stdoutOpen)
-                close(ctx->data.pipefdSTDOUT[1]);
-            if (ctx->data.stderrOpen)
-                close(ctx->data.pipefdSTDERR[1]);
-            if (ctx->data.stdinOpen)
-                close(ctx->data.pipefdSTDIN[0]);
-
-			ctx->data.bCanUpdate = true;
-			signal(SIGCHLD, [](int sig)
-			{
-				if (currentpid > 0)
-				{
-					wait(&currentpid);	// Wait for the process to finish
-					currentpid = -1;	// Reset the pid
-				}
-			});
-		}
-	}
-	else
-	{
-		return -1;
-	}
-	return 0;
+			return -1;
+		return 0;
+	});
 }
 
 void uexec::InternalUnix::destroyForReuseUnix(ScriptRunner* ctx) noexcept
 {
-	ctx->data.pid = -1;
 	ctx->data.pipefdSTDOUT[0] = -1;
 	ctx->data.pipefdSTDOUT[1] = -1;
     ctx->data.pipefdSTDERR[0] = -1;
@@ -101,29 +128,41 @@ void uexec::InternalUnix::destroyForReuseUnix(ScriptRunner* ctx) noexcept
     ctx->data.pipefdSTDIN[0] = -1;
     ctx->data.pipefdSTDIN[1] = -1;
 
+	// Assign address to null and erase the pid from the pid manager array
+	ctx->data.pidp = nullptr;
+
+	return execonparent<void>(ctx, [](ScriptRunner* ctx) -> void {
+		uexec_internal_pids_do_not_touch.erase(uexec_internal_pids_do_not_touch.begin() + static_cast<long>(ctx->data.pidpos));
+	});
 }
 
 bool uexec::InternalUnix::finishedUnix(const ScriptRunner* const ctx) noexcept
 {
-	return (ctx->data.bCanUpdate && currentpid == -1 ? true : false);
+	return (ctx->data.bCanUpdate && *ctx->data.pidp == -1 ? true : false);
 }
 
 void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 {
-	kill(currentpid, SIGTERM);
-	wait(&currentpid);
+	return execonparent<void>(ctx, [](ScriptRunner* ctx) -> void {
+		kill(*ctx->data.pidp, SIGTERM);
+		wait(ctx->data.pidp);
+	});
 }
 
 bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, int* pipe, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
-	bytesRead = read(pipe[0], buffer.data(), size);
-    return bytesRead;
+	return execonparent<bool>(ctx, [&](ScriptRunner* ctx) -> bool {
+		bytesRead = read(pipe[0], buffer.data(), size);
+		return bytesRead;
+	});
 }
 
 bool uexec::InternalUnix::writeUnix(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
 {
-	bytesWritten = write(ctx->data.pipefdSTDIN[0], buffer.data(), size);
-    return bytesWritten;
+	return execonparent<bool>(ctx, [&](ScriptRunner* ctx) -> bool {
+		bytesWritten = write(ctx->data.pipefdSTDIN[0], buffer.data(), size);
+		return bytesWritten;
+	});
 }
 #else
 int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept

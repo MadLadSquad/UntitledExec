@@ -1,10 +1,14 @@
 #pragma once
-#ifdef _WIN32
-    #include <windows.h>
-#endif
 
+#ifdef __cplusplus
 extern "C"
 {
+#endif
+    #ifdef _WIN32
+        #include <windows.h>
+    #endif
+
+
     struct RunnerData
     {
     #ifdef _WIN32
@@ -17,7 +21,9 @@ extern "C"
         int pipefdSTDIN[2];
         int pipefdSTDOUT[2];
         int pipefdSTDERR[2];
-        int pid;
+
+        pid_t* pidp;
+        size_t pidpos;
     #endif
         bool stderrOpen;
         bool stdoutOpen;
@@ -27,4 +33,6 @@ extern "C"
         bool bValid;
         bool bCanRestart;
     };
+#ifdef __cplusplus
 }
+#endif

@@ -53,7 +53,8 @@ namespace uexec
 
 		RunnerData data;
 	};
+
 #ifndef _WIN32
-	inline int currentpid = -1;
+	inline std::vector<pid_t> uexec_internal_pids_do_not_touch;
 #endif
 }
