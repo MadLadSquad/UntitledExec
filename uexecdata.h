@@ -7,10 +7,7 @@ extern "C"
     #ifdef _WIN32
         #include <windows.h>
     #endif
-
-#ifndef __cplusplus
-typedef unsigned char bool;
-#endif
+#include <stdbool.h>
 
     struct RunnerData
     {
