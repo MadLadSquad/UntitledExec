@@ -1,5 +1,23 @@
 #pragma once
 
+#ifdef UVK_LOG_EXPORT_FROM_LIBRARY
+    #ifdef _WIN32
+        #ifdef UVK_LIB_COMPILE
+            #define UVK_PUBLIC_API __declspec(dllexport)
+            #define UVK_PUBLIC_TMPL_API __declspec(dllexport)
+        #else
+            #define UVK_PUBLIC_API __declspec(dllimport)
+            #define UVK_PUBLIC_TMPL_API
+        #endif
+    #else
+        #define UVK_PUBLIC_API
+        #define UVK_PUBLIC_TMPL_API
+    #endif
+#else
+    #define UVK_PUBLIC_API
+    #define UVK_PUBLIC_TMPL_API
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -7,9 +25,9 @@ extern "C"
     #ifdef _WIN32
         #include <windows.h>
     #endif
-#include <stdbool.h>
+    #include <stdbool.h>
 
-    struct RunnerData
+    struct UVK_PUBLIC_API RunnerData
     {
     #ifdef _WIN32
         PROCESS_INFORMATION pif;				// The process information struct, contains a handle to the process
@@ -34,5 +52,5 @@ extern "C"
         bool bCanRestart;
     };
 #ifdef __cplusplus
-}
+};
 #endif

@@ -21,9 +21,9 @@
 namespace uexec
 {
 	// An abstraction over execvp and wait
-	int execandwait(char* const* command) noexcept;
+	UVK_PUBLIC_API int execandwait(char* const* command) noexcept;
 
-	class ScriptRunner
+	class UVK_PUBLIC_API ScriptRunner
 	{
 	public:
 		// Given an array, will start executing the script, will return -1 on failure
