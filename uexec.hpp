@@ -53,7 +53,7 @@ namespace uexec
 		friend class InternalUnix;
 		friend class InternalWindows;
 
-		RunnerData data;
+		uexec_RunnerData data;
 	};
 
 #ifndef _WIN32

@@ -27,14 +27,14 @@ extern "C"
     #endif
     #include <stdbool.h>
 
-    struct UVK_PUBLIC_API RunnerData
+    typedef struct UVK_PUBLIC_API uexec_RunnerData
     {
     #ifdef _WIN32
-        PROCESS_INFORMATION pif;				// The process information struct, contains a handle to the process
+        PROCESS_INFORMATION pif;                        // The process information struct, contains a handle to the process
         HANDLE stderrRead, stdoutRead, stdinRead;
         HANDLE stderrWrite, stdoutWrite, stdinWrite;
 
-        bool bFinished;					// This indicates whether the process has finished executing in order to destroy it
+        bool bFinished;                                 // This indicates whether the process has finished executing in order to destroy it
     #else
         int pipefdSTDIN[2];
         int pipefdSTDOUT[2];
@@ -50,7 +50,7 @@ extern "C"
         bool bCanUpdate;
         bool bValid;
         bool bCanRestart;
-    };
+    } uexec_RunnerData;
 #ifdef __cplusplus
 };
 #endif
