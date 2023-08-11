@@ -1,0 +1,12 @@
+prefix="@CMAKE_INSTALL_PREFIX@"
+exec_prefix="${prefix}"
+libdir="${prefix}/lib"
+includedir="${prefix}/include"
+
+Name: @PROJECT_NAME@
+Description: A cross-platform script runner for C and C++ using fork and exec or CreateProcess
+URL: https://github.com/MadLadSquad/UntitledExec
+Version: @PROJECT_VERSION@
+Cflags: -I"${includedir}"
+Libs: -L"${libdir}" -l@PROJECT_NAME@
+Libs.private: -L"${libdir}" -l@PROJECT_NAME@
