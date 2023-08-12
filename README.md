@@ -11,4 +11,4 @@ A generic cross-platform wrapper on top of fork and exec/CreateProcess. It offer
 - [x] Full C and C++ APIs
 
 ## Installation and usage
-You can find all information you need under the [wiki](https://github.com/MadLadSquad/UntitledExec/wiki)
+You can find all information on the [wiki](https://github.com/MadLadSquad/UntitledExec/wiki).
