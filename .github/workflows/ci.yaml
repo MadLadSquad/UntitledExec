@@ -20,3 +20,11 @@ jobs:
       uses: microsoft/setup-msbuild@v1.1
     - name: Build for engine
       run: "bash ci.sh"
+  MacOS:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Build
+      run: "bash ci.sh"
