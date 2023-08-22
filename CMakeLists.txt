@@ -12,9 +12,10 @@ if (BUILD_VARIANT_STATIC)
     set(UEXEC_LIBRARY_TYPE "STATIC")
 endif()
 
-set(UEXEC_HEADERS "uexec.hpp" "uexecdata.h" "uexecunix.hpp" "uexecwindows.hpp" "C/cuexec.h")
+set(UEXEC_HEADERS "uexec.hpp" "uexecdata.h" "uexecunix.hpp" "uexecwindows.hpp")
+set(UEXEC_C_HEADERS "C/cuexec.h")
 
-add_library(uexec ${UEXEC_LIBRARY_TYPE} uexec.cpp uexecunix.cpp uexecwindows.cpp C/cuexec.cpp ${UEXEC_HEADERS})
+add_library(uexec ${UEXEC_LIBRARY_TYPE} uexec.cpp uexecunix.cpp uexecwindows.cpp C/cuexec.cpp ${UEXEC_HEADERS} ${UEXEC_C_HEADERS})
 if (NOT WIN32)
     target_link_libraries(uexec util)
 endif()
@@ -29,6 +30,7 @@ if (UIMGUI_INSTALL)
             LIBRARY DESTINATION lib/
             ARCHIVE DESTINATION lib/)
     install(FILES ${UEXEC_HEADERS} DESTINATION include/uexec)
+    install(FILES ${UEXEC_C_HEADERS} DESTINATION include/uexec/C)
     install(FILES ${PROJECT_BINARY_DIR}/uexec.pc
             DESTINATION lib/pkgconfig/)
 endif()
