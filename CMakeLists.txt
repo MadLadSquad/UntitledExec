@@ -20,6 +20,7 @@ if (NOT WIN32)
     target_link_libraries(uexec util)
 endif()
 
+target_compile_definitions(uexec PRIVATE UVK_LOG_EXPORT_FROM_LIBRARY UVK_LIB_COMPILE)
 target_compile_definitions(uexec PUBLIC UIMGUI_UEXEC_SUBMODULE_ENABLED)
 list(APPEND compile_defs "UIMGUI_UEXEC_SUBMODULE_ENABLED")
 
