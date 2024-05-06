@@ -28,8 +28,8 @@ configure_file(uexec.pc.in uexec.pc @ONLY)
 
 if (UIMGUI_INSTALL)
     install(TARGETS uexec
-            LIBRARY DESTINATION lib/
-            ARCHIVE DESTINATION lib/)
+            LIBRARY DESTINATION lib64/
+            ARCHIVE DESTINATION lib64/)
     install(FILES ${UEXEC_HEADERS} DESTINATION include/uexec)
     install(FILES ${UEXEC_C_HEADERS} DESTINATION include/uexec/C)
     install(FILES ${PROJECT_BINARY_DIR}/uexec.pc
