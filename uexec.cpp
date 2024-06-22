@@ -18,7 +18,7 @@ int uexec::execandwait(char* const* command) noexcept
 #endif
 }
 
-int uexec::ScriptRunner::init(char* const* args, bool bOpenStderrPipe, bool bOpenStdoutPipe, bool bOpenStdinPipe) noexcept
+int uexec::ScriptRunner::init(char* const* args, const bool bOpenStderrPipe, const bool bOpenStdoutPipe, const bool bOpenStdinPipe) noexcept
 {
 #ifndef _WIN32
 	data.stderrOpen = false;

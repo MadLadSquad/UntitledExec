@@ -29,13 +29,12 @@ namespace uexec
 	T execonparent(ScriptRunner* ctx, const std::function<T(ScriptRunner*)>& func)
 	{
 		bool bFailedCheck = false;
-		for (auto& pid : uexec_internal_pids_do_not_touch)
+		for (const auto& pid : uexec_internal_pids_do_not_touch)
 			if (pid == 0)
 				bFailedCheck = true;
 		if (!bFailedCheck)
 			return func(ctx);
-		else
-			while (true); // This is here so that we can completely block the event
+    	while (true); // This is here so that we can completely block the event
 	}
 }
 
@@ -57,48 +56,48 @@ int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 
 int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 {
-	return execonparent<int>(ctx, [&](ScriptRunner* ctx) -> int
+	return execonparent<int>(ctx, [&](ScriptRunner* context) -> int
 	{
-		initPipes(ctx->data.pipefdSTDOUT, ctx->data.stdoutOpen);
-		initPipes(ctx->data.pipefdSTDERR, ctx->data.stderrOpen);
-		initPipes(ctx->data.pipefdSTDIN, ctx->data.stdinOpen);
+		initPipes(context->data.pipefdSTDOUT, context->data.stdoutOpen);
+		initPipes(context->data.pipefdSTDERR, context->data.stderrOpen);
+		initPipes(context->data.pipefdSTDIN, context->data.stdinOpen);
 
-		ctx->data.pidpos = uexec_internal_pids_do_not_touch.size();
+		context->data.pidpos = uexec_internal_pids_do_not_touch.size();
 		uexec_internal_pids_do_not_touch.push_back(fork());
-		ctx->data.pidp = &uexec_internal_pids_do_not_touch.back();
+		context->data.pidp = &uexec_internal_pids_do_not_touch.back();
 
-		auto pid = *ctx->data.pidp;
+		auto pid = *context->data.pidp;
 		if (pid != -1)
 		{
 			if (pid == 0)
 			{
-				if (ctx->data.stdoutOpen)
-					initDescriptors(ctx->data.pipefdSTDOUT, STDOUT_FILENO, 0, 1);
-				if (ctx->data.stderrOpen)
-					initDescriptors(ctx->data.pipefdSTDERR, STDERR_FILENO, 0, 1);
-				if (ctx->data.stdinOpen)
-					initDescriptors(ctx->data.pipefdSTDIN, STDIN_FILENO, 1, 0);
+				if (context->data.stdoutOpen)
+					initDescriptors(context->data.pipefdSTDOUT, STDOUT_FILENO, 0, 1);
+				if (context->data.stderrOpen)
+					initDescriptors(context->data.pipefdSTDERR, STDERR_FILENO, 0, 1);
+				if (context->data.stdinOpen)
+					initDescriptors(context->data.pipefdSTDIN, STDIN_FILENO, 1, 0);
 
 				execvp(args[0], args);
 				wait(&pid);
 			}
 			else
 			{
-				if (ctx->data.stdoutOpen)
-					close(ctx->data.pipefdSTDOUT[1]);
-				if (ctx->data.stderrOpen)
-					close(ctx->data.pipefdSTDERR[1]);
-				if (ctx->data.stdinOpen)
-					close(ctx->data.pipefdSTDIN[0]);
+				if (context->data.stdoutOpen)
+					close(context->data.pipefdSTDOUT[1]);
+				if (context->data.stderrOpen)
+					close(context->data.pipefdSTDERR[1]);
+				if (context->data.stdinOpen)
+					close(context->data.pipefdSTDIN[0]);
 
-				ctx->data.bCanUpdate = true;
+				context->data.bCanUpdate = true;
 				struct sigaction actiondt{};
 				// Signal handler for SIGCHLD, basically if the child sends this its execution has ended, so we need
 				// to destroy it. However, you might notice that we don't modify the internal pid manager to remove the
 				// useless PID. That's because if we did that there is no way for the instance that owns the PID to know
 				// if it has died. Instead, the user himself has to handle destruction. This should be achieved by
 				// continually querying "finished" then calling "destroyForReuse" on fail
-				actiondt.sa_sigaction = [](int signal, siginfo_t* info, void* next) -> void {
+				actiondt.sa_sigaction = [](int, siginfo_t* info, void*) -> void {
 					for (int& a : uexec_internal_pids_do_not_touch)
 					{
 						if (a == info->si_pid)
@@ -152,7 +151,7 @@ void uexec::InternalUnix::terminateUnix(ScriptRunner* ctx) noexcept
 
 bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, int* pipe, uexecstring& buffer, size_t size, size_t& bytesRead) noexcept
 {
-	return execonparent<bool>(ctx, [&](ScriptRunner* ctx) -> bool {
+	return execonparent<bool>(ctx, [&](ScriptRunner*) -> bool {
 		bytesRead = read(pipe[0], buffer.data(), size);
 		return bytesRead;
 	});
@@ -160,8 +159,8 @@ bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, int* pipe, uexecstring& bu
 
 bool uexec::InternalUnix::writeUnix(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
 {
-	return execonparent<bool>(ctx, [&](ScriptRunner* ctx) -> bool {
-		bytesWritten = write(ctx->data.pipefdSTDIN[0], buffer.data(), size);
+	return execonparent<bool>(ctx, [&](ScriptRunner* context) -> bool {
+		bytesWritten = write(context->data.pipefdSTDIN[0], buffer.data(), size);
 		return bytesWritten;
 	});
 }
