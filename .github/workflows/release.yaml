@@ -39,7 +39,7 @@ jobs:
           git submodule update --remote --merge --init --recursive
           ver="${{ github.ref_name }}"
           sed -i "s/project(uexec.*/project(uexec VERSION ${ver:1})/g" CMakeLists.txt
-          git add . && git commit -m "Automatically bump version" && git push origin HEAD:master
+          (git add . && git commit -m "Automatically bump version" && git push origin HEAD:master) || echo "Nothing to commit"
 
       - name: Create archive
         shell: bash
@@ -47,7 +47,7 @@ jobs:
           rm -rf .git/
           tar cfJ untitled-exec.tar.xz . || echo "Might have failed"
       - name: Create Release
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v2
         with:
           body: |
             Check our discord for patch notes: https://discord.gg/4kyWu2Vu
