@@ -38,7 +38,7 @@ jobs:
           git fetch --all
           git submodule update --remote --merge --init --recursive
           ver="${{ github.ref_name }}"
-          echo "out=untitled-dbus-utils-${ver:1}" >> $GITHUB_OUTPUT
+          echo "out=untitled-exec-${ver:1}" >> $GITHUB_OUTPUT
           sed -i "s/project(uexec.*/project(uexec VERSION ${ver:1})/g" CMakeLists.txt
           (git add . && git commit -m "Automatically bump version" && git push origin HEAD:master) || echo "Nothing to commit"
       - name: Create archive
