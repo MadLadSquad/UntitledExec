@@ -45,7 +45,12 @@ int uexec::InternalUnix::execandwaitunix(char* const* command) noexcept
 	if (pid != -1)
 	{
 		if (pid == 0)
+		{
 			execvp(command[0], command);
+			// execvp only returns on failure - the child must not fall through into the
+			// caller's code, otherwise it would run as a duplicate of the parent process
+			_exit(127);
+		}
 		else
 			wait(&pid);
 	}
@@ -62,8 +67,8 @@ int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 		initPipes(context->data.pipefdSTDERR, context->data.stderrOpen);
 		initPipes(context->data.pipefdSTDIN, context->data.stdinOpen);
 
-		context->data.pidpos = uexec_internal_pids_do_not_touch.size();
 		uexec_internal_pids_do_not_touch.push_back(fork());
+		// The list guarantees this reference stays valid even as other runners are added/removed
 		context->data.pidp = &uexec_internal_pids_do_not_touch.back();
 
 		auto pid = *context->data.pidp;
@@ -79,7 +84,9 @@ int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 					initDescriptors(context->data.pipefdSTDIN, STDIN_FILENO, 1, 0);
 
 				execvp(args[0], args);
-				wait(&pid);
+				// execvp only returns on failure - terminate the child immediately so it
+				// cannot fall through into the parent's application code
+				_exit(127);
 			}
 			else
 			{
@@ -98,7 +105,7 @@ int uexec::InternalUnix::initUnix(char* const* args, ScriptRunner* ctx) noexcept
 				// if it has died. Instead, the user himself has to handle destruction. This should be achieved by
 				// continually querying "finished" then calling "destroyForReuse" on fail
 				actiondt.sa_sigaction = [](int, siginfo_t* info, void*) -> void {
-					for (int& a : uexec_internal_pids_do_not_touch)
+					for (pid_t& a : uexec_internal_pids_do_not_touch)
 					{
 						if (a == info->si_pid)
 						{
@@ -127,11 +134,21 @@ void uexec::InternalUnix::destroyForReuseUnix(ScriptRunner* ctx) noexcept
     ctx->data.pipefdSTDIN[0] = -1;
     ctx->data.pipefdSTDIN[1] = -1;
 
-	// Assign address to null and erase the pid from the pid manager array
+	// Erase this runner's slot from the pid manager by matching its stable address, then null
+	// the pointer. Indexing by position would be wrong here: erasing a slot must not disturb the
+	// slots (and therefore the pidp pointers) owned by any other live runner
+	pid_t* const target = ctx->data.pidp;
 	ctx->data.pidp = nullptr;
 
-	return execonparent<void>(ctx, [](ScriptRunner* ctx) -> void {
-		uexec_internal_pids_do_not_touch.erase(uexec_internal_pids_do_not_touch.begin() + static_cast<long>(ctx->data.pidpos));
+	return execonparent<void>(ctx, [target](ScriptRunner*) -> void {
+		for (auto it = uexec_internal_pids_do_not_touch.begin(); it != uexec_internal_pids_do_not_touch.end(); ++it)
+		{
+			if (&*it == target)
+			{
+				uexec_internal_pids_do_not_touch.erase(it);
+				break;
+			}
+		}
 	});
 }
 
@@ -160,7 +177,8 @@ bool uexec::InternalUnix::readUnix(ScriptRunner* ctx, int* pipe, uexecstring& bu
 bool uexec::InternalUnix::writeUnix(ScriptRunner* ctx, uexecstring& buffer, size_t size, size_t& bytesWritten) noexcept
 {
 	return execonparent<bool>(ctx, [&](ScriptRunner* context) -> bool {
-		bytesWritten = write(context->data.pipefdSTDIN[0], buffer.data(), size);
+		// The parent writes to the write end [1]; the read end [0] was closed after the fork
+		bytesWritten = write(context->data.pipefdSTDIN[1], buffer.data(), size);
 		return bytesWritten;
 	});
 }

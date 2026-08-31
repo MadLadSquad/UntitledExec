@@ -37,3 +37,6 @@ build/
 cmake-build-*/
 main.cpp
 main.c
+graphify-out/
+.agents/
+.claude/

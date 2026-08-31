@@ -4,6 +4,67 @@
 #include <iostream>
 #ifdef _WIN32
 #include <windows.h>
+#include <string>
+
+namespace
+{
+	// Appends a single argument to a command line, quoting/escaping it per the rules used by
+	// CommandLineToArgvW / the MSVC CRT so that arguments containing spaces, tabs or quotes survive
+	// intact. Without this, any argument with a space would be split by the child process.
+	void appendQuotedArg(std::string& out, const char* arg) noexcept
+	{
+		const std::string s = arg;
+		if (!s.empty() && s.find_first_of(" \t\n\v\"") == std::string::npos)
+		{
+			out += s;
+			return;
+		}
+
+		out += '"';
+		for (size_t i = 0; ; ++i)
+		{
+			size_t backslashes = 0;
+			while (i < s.size() && s[i] == '\\')
+			{
+				++i;
+				++backslashes;
+			}
+
+			if (i == s.size())
+			{
+				// Escape trailing backslashes so they don't escape the closing quote
+				out.append(backslashes * 2, '\\');
+				break;
+			}
+			if (s[i] == '"')
+			{
+				// Escape all backslashes plus the embedded quote
+				out.append(backslashes * 2 + 1, '\\');
+				out += '"';
+			}
+			else
+			{
+				out.append(backslashes, '\\');
+				out += s[i];
+			}
+		}
+		out += '"';
+	}
+
+	// Builds a fully quoted command line from filename + args[1..] (args[0] is replaced by the
+	// resolved filename)
+	uexecstring buildCommandLine(const char* filename, char* const* args) noexcept
+	{
+		std::string cmdline;
+		appendQuotedArg(cmdline, filename);
+		for (size_t i = 1; args[i] != nullptr; i++)
+		{
+			cmdline += ' ';
+			appendQuotedArg(cmdline, args[i]);
+		}
+		return uexecstring(cmdline.c_str());
+	}
+}
 
 int uexec::InternalWindows::execandwaitWindows(char* const* command) noexcept
 {
@@ -17,18 +78,16 @@ int uexec::InternalWindows::execandwaitWindows(char* const* command) noexcept
 		return -1;
 	}
 	
-	uexecstring str = uexecstring(filename) + " ";
-	for (size_t i = 1; command[i] != nullptr; i++)
-		str += uexecstring(command[i]) + " ";
-	
+	uexecstring str = buildCommandLine(filename, command);
+
 	PROCESS_INFORMATION pif;
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
 	ZeroMemory(&pif, sizeof(pif));
 	si.cb = sizeof(si);
-	
+
 	DWORD creationFlags = CREATE_NEW_CONSOLE;
-	if (!CreateProcess(filename, str.data(), nullptr, nullptr, false, creationFlags, nullptr, nullptr, &si, &pif));
+	if (!CreateProcess(filename, str.data(), nullptr, nullptr, false, creationFlags, nullptr, nullptr, &si, &pif))
 	{
 		return -1;
 	}
@@ -52,29 +111,48 @@ int uexec::InternalWindows::initWindows(char* const* args, ScriptRunner* ctx) no
 		return -1;
 	}
 	
-	uexecstring str = uexecstring(filename) + " ";
-	for (size_t i = 1; args[i] != nullptr; i++)
-		str += uexecstring(args[i]) + " ";
-	
+	uexecstring str = buildCommandLine(filename, args);
+
 	SECURITY_ATTRIBUTES sa;
 	sa.nLength = sizeof(SECURITY_ATTRIBUTES);
 	sa.bInheritHandle = true;
 	sa.lpSecurityDescriptor = nullptr;
-	
 
+
+	// Each pipe is created inheritable, then the parent-owned end is marked non-inheritable so the
+	// child does not inherit a duplicate of it. Leaving the parent's ends inheritable is the classic
+	// MSDN pitfall: the pipe never reports EOF because a live write handle survives in the child.
 	if (ctx->data.stderrOpen)
+	{
 		ctx->data.stderrOpen = CreatePipe(&ctx->data.stderrRead, &ctx->data.stderrWrite, &sa, 0);
+		if (ctx->data.stderrOpen)
+			SetHandleInformation(ctx->data.stderrRead, HANDLE_FLAG_INHERIT, 0);
+	}
 	if (ctx->data.stdoutOpen)
+	{
 		ctx->data.stdoutOpen = CreatePipe(&ctx->data.stdoutRead, &ctx->data.stdoutWrite, &sa, 0);
+		if (ctx->data.stdoutOpen)
+			SetHandleInformation(ctx->data.stdoutRead, HANDLE_FLAG_INHERIT, 0);
+	}
 	if (ctx->data.stdinOpen)
+	{
 		ctx->data.stdinOpen = CreatePipe(&ctx->data.stdinRead, &ctx->data.stdinWrite, &sa, 0);
+		if (ctx->data.stdinOpen)
+			SetHandleInformation(ctx->data.stdinWrite, HANDLE_FLAG_INHERIT, 0);
+	}
 
 
 	// Create the child process
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(STARTUPINFO));
 	si.cb = sizeof(STARTUPINFO);
-	
+
+	// Default any stream the caller did not request to this process's own standard handle, so a
+	// child spawned with only (say) stdout piped still has a working stderr/stdin
+	si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+	si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+	si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+
 	if (ctx->data.stderrOpen)
 		si.hStdError = ctx->data.stderrWrite;
 	if (ctx->data.stdoutOpen)

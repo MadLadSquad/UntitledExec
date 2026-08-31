@@ -10,7 +10,7 @@
 	#include <string>
 	typedef std::string uexecstring;
 #endif
-#include <vector>
+#include <list>
 #ifdef _WIN32
 	#include <windows.h>
 	#include <thread>
@@ -53,10 +53,15 @@ namespace uexec
 		friend class InternalUnix;
 		friend class InternalWindows;
 
-		uexec_RunnerData data;
+		// Value-initialised so that valid()/finished()/startable()/update() never read
+		// indeterminate memory when called before init()
+		uexec_RunnerData data{};
 	};
 
 #ifndef _WIN32
-	inline std::vector<pid_t> uexec_internal_pids_do_not_touch;
+	// A std::list is used instead of a std::vector so that the address of each runner's slot
+	// (stored in RunnerData::pidp) stays valid regardless of insertions/erasures of other
+	// runners - a vector would invalidate those pointers on reallocation and shift indices on erase
+	inline std::list<pid_t> uexec_internal_pids_do_not_touch;
 #endif
 }

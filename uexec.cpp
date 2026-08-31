@@ -20,25 +20,21 @@ int uexec::execandwait(char* const* command) noexcept
 
 int uexec::ScriptRunner::init(char* const* args, const bool bOpenStderrPipe, const bool bOpenStdoutPipe, const bool bOpenStdinPipe) noexcept
 {
-#ifndef _WIN32
-	data.stderrOpen = false;
-	data.stdoutOpen = false;
-	data.stdinOpen = false;
-
-	data.bCanUpdate = false;
+	data.bCanRestart = false;
 	data.bValid = true;
-#else
-	data.bFinished = false;
-#endif
-    data.bCanRestart = false;
 
 	data.stderrOpen = bOpenStderrPipe;
-    data.stdoutOpen = bOpenStdoutPipe;
-    data.stdinOpen = bOpenStdinPipe;
+	data.stdoutOpen = bOpenStdoutPipe;
+	data.stdinOpen = bOpenStdinPipe;
 
 #ifdef _WIN32
+	data.bFinished = false;
+	// Windows drives completion detection through update(), which is gated on bCanUpdate
+	data.bCanUpdate = true;
 	return InternalWindows::initWindows(args, this);
 #else
+	// The Unix parent branch flips this on once the child has been forked successfully
+	data.bCanUpdate = false;
 	return InternalUnix::initUnix(args, this);
 #endif
 }
