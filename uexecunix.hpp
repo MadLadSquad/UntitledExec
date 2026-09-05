@@ -15,6 +15,10 @@ namespace uexec
 		friend class ScriptRunner;
 
 		static int initUnix(char* const* args, ScriptRunner* ctx) noexcept;
+		// Closes the parent's ends of the pipes. Idempotent
+		static void closeDescriptorsUnix(ScriptRunner* ctx) noexcept;
+		// Removes this runner's slot from the global pid manager. Idempotent
+		static void releasePidSlotUnix(ScriptRunner* ctx) noexcept;
 		static void destroyForReuseUnix(ScriptRunner* ctx) noexcept;
 		static bool finishedUnix(const ScriptRunner* ctx) noexcept;
 		static void terminateUnix(ScriptRunner* ctx) noexcept;

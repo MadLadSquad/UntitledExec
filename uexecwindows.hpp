@@ -15,6 +15,8 @@ namespace uexec
 		
 		static int initWindows(char* const* args, ScriptRunner* ctx) noexcept;
 		static void updateWindows(ScriptRunner* ctx) noexcept;
+		// Closes the parent's ends of the pipes. Idempotent
+		static void closeDescriptorsWindows(ScriptRunner* ctx) noexcept;
 		static void destroyForReuseWindows(ScriptRunner* ctx) noexcept;
 		static bool finishedWindows(const ScriptRunner* ctx) noexcept;
 		static void terminateWindows(ScriptRunner* ctx) noexcept;

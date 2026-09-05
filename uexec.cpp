@@ -1,7 +1,6 @@
 #include "uexec.hpp"
 #ifdef _WIN32
 	#include <windows.h>
-	#include <iostream>
 #else
 	#include <unistd.h>
 #endif
@@ -20,6 +19,13 @@ int uexec::execandwait(char* const* command) noexcept
 
 int uexec::ScriptRunner::init(char* const* args, const bool bOpenStderrPipe, const bool bOpenStdoutPipe, const bool bOpenStdinPipe) noexcept
 {
+	// A runner that is already driving a process has to be torn down first. Initialising over the
+	// top of one orphans the running child along with its pipes and its slot in the pid manager,
+	// none of which anything can reach afterwards. A fresh or destroyed runner has bValid false,
+	// and destroyForReuse() sets bCanRestart, so only the live case is rejected here
+	if (data.bValid && !data.bCanRestart)
+		return -1;
+
 	data.bCanRestart = false;
 	data.bValid = true;
 
@@ -47,13 +53,18 @@ void uexec::ScriptRunner::update() noexcept
 
 void uexec::ScriptRunner::destroy() noexcept
 {
-	if (finished())
-        data.bValid = false;
-	else
-	{
+	if (!finished())
 		terminate();
-		data.bValid = false;
-	}
+
+	// destroy() is the terminal call for a runner that will not be reused, so everything the run
+	// still owns has to be released here too: the parent's pipe ends, and on Unix the runner's slot
+	// in the global pid manager. Leaving either to destroyForReuse() meant a plain init()/destroy()
+	// cycle leaked both for the lifetime of the process
+	InternalWindows::closeDescriptorsWindows(this);
+	InternalUnix::closeDescriptorsUnix(this);
+	InternalUnix::releasePidSlotUnix(this);
+
+	data.bValid = false;
 }
 
 bool uexec::ScriptRunner::valid() const noexcept
@@ -77,7 +88,7 @@ void uexec::ScriptRunner::destroyForReuse() noexcept
 bool uexec::ScriptRunner::finished() const noexcept
 {
 #ifdef _WIN32
-	return data.bFinished;
+	return InternalWindows::finishedWindows(this);
 #else
 	return InternalUnix::finishedUnix(this);
 #endif

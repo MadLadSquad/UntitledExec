@@ -1,5 +1,16 @@
 #pragma once
 
+// This is an installed public header, so it has to be self-contained rather than relying on the
+// consumer having included these first - pid_t used to resolve only by accident, through a
+// transitive include from uexec.hpp or from glibc's <stdlib.h> under _DEFAULT_SOURCE. Included
+// outside the extern "C" block below, since a system header may contain C++ constructs of its own
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <sys/types.h>
+#endif
+#include <stdbool.h>
+
 #ifdef MLS_EXPORT_LIBRARY
     #ifdef _WIN32
         #ifdef MLS_LIB_COMPILE
@@ -18,11 +29,6 @@
 extern "C"
 {
 #endif
-    #ifdef _WIN32
-        #include <windows.h>
-    #endif
-    #include <stdbool.h>
-
     typedef struct MLS_PUBLIC_API uexec_RunnerData
     {
     #ifdef _WIN32
@@ -37,7 +43,6 @@ extern "C"
         int pipefdSTDERR[2];
 
         pid_t* pidp;
-        size_t pidpos;
     #endif
         bool stderrOpen;
         bool stdoutOpen;

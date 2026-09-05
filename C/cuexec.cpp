@@ -81,7 +81,17 @@ extern "C"
 
     bool uexec_runner_write(uexec_RunnerData* data, const char* buffer, size_t size, size_t* bytesWritten)
     {
-        uexecstring str = buffer;
+        if (buffer == nullptr || bytesWritten == nullptr)
+            return false;
+
+        // Built from the caller's explicit length rather than from the pointer alone: constructing
+        // the string from a const char* stops at the first NUL, which silently truncated any binary
+        // payload while the backend was still handed the caller's full size to write
+        uexecstring str;
+        str.resize(size);
+        if (size != 0)
+            memcpy(str.data(), buffer, size);
+
         return cast(data)->write(str, size, *bytesWritten);
     }
 }
